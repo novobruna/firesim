@@ -30,6 +30,8 @@ class FPGAManagedStreamEngine(p: Parameters, val params: StreamEngineParameters)
   val cpuManagedAXI4NodeOpt = None
 
   val (fpgaManagedAXI4NodeOpt, toCPUNode) = if (hasStreams) {
+     // The implicit val defined in StreamEngine is not accessible here; Make a duplicate that can be referenced
+     // by diplomatic nodes
     implicit val pShadow = p
     val xbar = AXI4Xbar()
     val toCPUNode = AXI4MasterNode(
@@ -65,7 +67,7 @@ class FPGAManagedStreamEngine(p: Parameters, val params: StreamEngineParameters)
         ): ToCPUStreamDriverParameters = {
 
       require(BridgeStreamConstants.streamWidthBits == axi4.params.dataBits, 
-        s"FPGAManagedStreamEngine requires stream widths to match to-cpu AXI4 data width")
+        s"FPGAManagedStreamEngine requires stream widths to match FPGA-managed AXI4 data width")
       val toHostCPUQueueDepth = chParams.fpgaBufferDepth
       require(toHostCPUQueueDepth > beatsPerPage)
       val bufferSizeBytes = (1 << log2Ceil(toHostCPUQueueDepth)) * (BridgeStreamConstants.streamWidthBits/8)
@@ -120,11 +122,9 @@ class FPGAManagedStreamEngine(p: Parameters, val params: StreamEngineParameters)
       // When the driver calls for a flush, write at least as many beats to the
       // CPU as are currently avalable in the outgoingQueue. More may be written
       // if new data is enqueued.
-      //slel
       // Waiting for the FSM to go idle ensures io.count will not be decremented
       // in elthe same cycle. Maybe not necessary?
       when (doFlush && (state === idle)) {
-        printf("Driver calls for flush of %d beats\n", outgoingQueue.io.count)
         doFlush := false.B
         flushBeatsToIssue := outgoingQueue.io.count
         flushBeatsToAck   := outgoingQueue.io.count

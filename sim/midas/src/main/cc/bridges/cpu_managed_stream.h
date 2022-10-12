@@ -48,7 +48,7 @@ public:
   CPUManagedDriver(StreamParameters params,
                    std::function<uint32_t(size_t)> mmio_read_func)
       : params(params), mmio_read_func(mmio_read_func){};
-  virtual ~CPUManagedDriver() {};
+  virtual ~CPUManagedDriver(){};
 
 private:
   StreamParameters params;
@@ -70,7 +70,8 @@ public:
  * implemented with axi4_read, and is provided by the host-platform.
  *
  */
-class FPGAToCPUDriver final : public CPUManagedDriver, public FPGAToCPUStreamDriver {
+class FPGAToCPUDriver final : public CPUManagedDriver,
+                              public FPGAToCPUStreamDriver {
 public:
   FPGAToCPUDriver(StreamParameters params,
                   std::function<uint32_t(size_t)> mmio_read,
@@ -95,7 +96,8 @@ private:
  * FPGA out of a user-provided buffer. IO over a CPU-managed AXI4 IF is
  * implemented with axi4_write, and is provided by the host-platform.
  */
-class CPUToFPGADriver final : public CPUManagedDriver, public CPUToFPGAStreamDriver {
+class CPUToFPGADriver final : public CPUManagedDriver,
+                              public CPUToFPGAStreamDriver {
 public:
   CPUToFPGADriver(StreamParameters params,
                   std::function<uint32_t(size_t)> mmio_read,

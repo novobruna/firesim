@@ -5,8 +5,10 @@
 #include <iostream>
 
 void FPGAManagedStreams::FPGAToCPUDriver::init() {
-  this->mmio_write(this->params.toHostPhysAddrHighAddr, (uint32_t) (this->buffer_base_fpga >> 32));
-  this->mmio_write(this->params.toHostPhysAddrLowAddr, (uint32_t) this->buffer_base_fpga);
+  this->mmio_write(this->params.toHostPhysAddrHighAddr,
+                   (uint32_t)(this->buffer_base_fpga >> 32));
+  this->mmio_write(this->params.toHostPhysAddrLowAddr,
+                   (uint32_t)this->buffer_base_fpga);
 }
 /**
  * @brief Dequeues as much as num_bytes of data from the associated bridge

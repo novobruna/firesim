@@ -60,10 +60,12 @@ public:
                   uint64_t buffer_base_fpga,
                   std::function<uint32_t(size_t)> mmio_read,
                   std::function<void(size_t, uint32_t)> mmio_write)
-      : params(params), buffer_base(buffer_base), buffer_base_fpga(buffer_base_fpga), mmio_read_func(mmio_read),
-        mmio_write_func(mmio_write) {};
+      : params(params), buffer_base(buffer_base),
+        buffer_base_fpga(buffer_base_fpga), mmio_read_func(mmio_read),
+        mmio_write_func(mmio_write){};
 
-  virtual size_t pull(void *dest, size_t num_bytes, size_t required_bytes) override;
+  virtual size_t
+  pull(void *dest, size_t num_bytes, size_t required_bytes) override;
   virtual void flush() override;
   virtual void init() override;
 

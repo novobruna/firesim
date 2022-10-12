@@ -42,8 +42,8 @@ simif_f1_t::simif_f1_t(int argc, char **argv) {
         CPUMANAGEDSTREAMENGINE_0_from_cpu_count_addrs[i],
         CPUMANAGEDSTREAMENGINE_0_from_cpu_buffer_sizes[i]);
 
-    from_host_streams.push_back(
-        CPUManagedStreams::CPUToFPGADriver(params, mmio_read_func, cpu_managed_axi4_write_func));
+    from_host_streams.push_back(CPUManagedStreams::CPUToFPGADriver(
+        params, mmio_read_func, cpu_managed_axi4_write_func));
   }
 
   for (int i = 0; i < CPUMANAGEDSTREAMENGINE_0_to_cpu_stream_count; i++) {
@@ -53,8 +53,8 @@ simif_f1_t::simif_f1_t(int argc, char **argv) {
         CPUMANAGEDSTREAMENGINE_0_to_cpu_count_addrs[i],
         CPUMANAGEDSTREAMENGINE_0_to_cpu_buffer_sizes[i]);
 
-    to_host_streams.push_back(
-        CPUManagedStreams::FPGAToCPUDriver(params, mmio_read_func, cpu_managed_axi4_read_func));
+    to_host_streams.push_back(CPUManagedStreams::FPGAToCPUDriver(
+        params, mmio_read_func, cpu_managed_axi4_read_func));
   }
 }
 

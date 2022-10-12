@@ -19,25 +19,28 @@ class WriteMetadata(val numBeatsWidth: Int) extends Bundle {
 class FPGAManagedStreamEngine(p: Parameters, val params: StreamEngineParameters) extends StreamEngine(p) {
   require(sinkParams.isEmpty, "FPGAManagedStreamEngine does not currently support FPGA-sunk streams.")
 
-  // Picked arbitrarily
-  val pagesPerBuffer = 4
-  val maxFlight = pagesPerBuffer
-  val bytesPerPage = 4096
-  val bytesPerBeat = BridgeStreamConstants.streamWidthBits / 8
-  require(isPow2(bytesPerBeat))
-  val beatsPerPage = bytesPerPage / bytesPerBeat
+  // Beats refers to 512b words moving over a stream
+  val pageBytes = 4096
+  val beatBytes = BridgeStreamConstants.streamWidthBits / 8
+  val pageBeats = pageBytes / beatBytes
+
+  def maxFlightForStream(params: StreamSourceParameters): Int =
+    (params.fpgaBufferDepth * beatBytes) / pageBytes
 
   val cpuManagedAXI4NodeOpt = None
 
   val (fpgaManagedAXI4NodeOpt, toCPUNode) = if (hasStreams) {
-     // The implicit val defined in StreamEngine is not accessible here; Make a duplicate that can be referenced
-     // by diplomatic nodes
+     // The implicit val defined in StreamEngine is not accessible here; Make a
+     // duplicate that can be referenced by diplomatic nodes
     implicit val pShadow = p
     val xbar = AXI4Xbar()
     val toCPUNode = AXI4MasterNode(
-      Seq(AXI4MasterPortParameters(
-        sourceParams.map { p => AXI4MasterParameters(name = p.name, maxFlight = Some(maxFlight)) }
-     )))
+        sourceParams.map { p => AXI4MasterPortParameters(Seq(
+          AXI4MasterParameters(
+          name = p.name,
+          maxFlight = Some(maxFlightForStream(p)))))
+        }
+     )
     xbar :=* AXI4Buffer() :=* toCPUNode
     (Some(xbar), Some(toCPUNode))
   } else {
@@ -66,177 +69,177 @@ class FPGAManagedStreamEngine(p: Parameters, val params: StreamEngineParameters)
         chParams: StreamSourceParameters,
         ): ToCPUStreamDriverParameters = {
 
-      require(BridgeStreamConstants.streamWidthBits == axi4.params.dataBits, 
+      require(BridgeStreamConstants.streamWidthBits == axi4.params.dataBits,
         s"FPGAManagedStreamEngine requires stream widths to match FPGA-managed AXI4 data width")
-      val toHostCPUQueueDepth = chParams.fpgaBufferDepth
-      require(toHostCPUQueueDepth > beatsPerPage)
-      val bufferSizeBytes = (1 << log2Ceil(toHostCPUQueueDepth)) * (BridgeStreamConstants.streamWidthBits/8)
+      val cpuBufferDepthBeats = chParams.fpgaBufferDepth
+      require(cpuBufferDepthBeats > pageBeats)
+      val cpuBufferSizeBytes = (1 << log2Ceil(cpuBufferDepthBeats)) * (BridgeStreamConstants.streamWidthBits/8)
       // This to simplify the hardware
-      require(isPow2(bufferSizeBytes))
+      require(isPow2(cpuBufferSizeBytes))
 
       val toHostPhysAddrHigh   = Reg(UInt(32.W))
       val toHostPhysAddrLow    = Reg(UInt(32.W))
-      val bytesConsumedByCPU   = RegInit(0.U(log2Ceil(bufferSizeBytes + 1).W))
+      val bytesConsumedByCPU   = RegInit(0.U(log2Ceil(cpuBufferSizeBytes + 1).W))
 
-      val outgoingQueue = Module(new BRAMQueue(2 * beatsPerPage)(UInt(BridgeStreamConstants.streamWidthBits.W)))
+      // This sets up a double buffer that should give full throughput for a
+      // single stream system. This queue could be grown under a multi-stream system.
+      val outgoingQueue = Module(new BRAMQueue(2 * pageBeats)(UInt(BridgeStreamConstants.streamWidthBits.W)))
       outgoingQueue.io.enq <> channel
 
-      val writeCredits = RegInit(bufferSizeBytes.U(log2Ceil(bufferSizeBytes + 1).W))
-      val readCredits  = RegInit(0.U(log2Ceil(bufferSizeBytes + 1).W))
-      val writePtr     = RegInit(0.U(log2Ceil(bufferSizeBytes).W))
+      val writeCredits = RegInit(cpuBufferSizeBytes.U(log2Ceil(cpuBufferSizeBytes + 1).W))
+      val readCredits  = RegInit(0.U(log2Ceil(cpuBufferSizeBytes + 1).W))
+      val writePtr     = RegInit(0.U(log2Ceil(cpuBufferSizeBytes).W))
       val doneInit     = RegInit(false.B)
-      val doFlush      = RegInit(false.B)
-      val flushBeatsToIssue, flushBeatsToAck = RegInit(0.U(log2Ceil(toHostCPUQueueDepth+1).W))
-      val inflightBeatCounts = Module(new Queue(new WriteMetadata(log2Ceil(beatsPerPage + 1)), maxFlight))
+      // Key assumption: write acknowledgements can be used as a synchronization
+      // point, after which the CPU can read new data written into its circular
+      // buffer. This tracks inflight requests, to increment read credits on
+      // write acknowledgement, and to cap maxflight.
+      val inflightBeatCounts = Module(new Queue(new WriteMetadata(log2Ceil(pageBeats + 1)), maxFlightForStream(chParams)))
 
-      val idle :: sendData :: Nil = Enum(2)
+      val idle :: sendAddress :: sendData :: Nil = Enum(3)
       val state = RegInit(idle)
-      val beatsToSendMinus1 = RegInit(0.U(log2Ceil(beatsPerPage).W))
+      val beatsToSendMinus1 = RegInit(0.U(log2Ceil(pageBeats).W))
 
-      // Ensure we do not cross page boundaries. Again -1, for AXI4 encoding of length
+      // Ensure we do not cross page boundaries per AXI4 spec.
       val beatsToPageBoundary =
-        beatsPerPage.U - writePtr(log2Ceil(bytesPerPage) - 1, log2Ceil(bytesPerBeat))
-      assert((beatsToPageBoundary > 0.U) && (beatsToPageBoundary <= (beatsPerPage.U)))
+        pageBeats.U - writePtr(log2Ceil(pageBytes) - 1, log2Ceil(beatBytes))
+      assert((beatsToPageBoundary > 0.U) && (beatsToPageBoundary <= (pageBeats.U)))
 
-      // BeatsToPageBoundary covers the end of the circular queue only because
+      // Establish the largest AXI4 write request we can make, by doing a min
+      // reduction over the following bounds:
+      val writeBounds = Seq(
+        outgoingQueue.io.count,                   // Beats available for enqueue in local FPGA buffer
+        writeCredits >> log2Ceil(beatBytes).U,    // Space available in cpu buffer
+        beatsToPageBoundary)                      // Length to end of page
+      // NB: BeatsToPageBoundary covers the end of the circular buffer only because
       // we ensure the buffer size is a multiple of page size
-      val bounds = Seq(
-        outgoingQueue.io.count,        // Available beats
-        writeCredits >> log2Ceil(bytesPerBeat).U, // Space on host CPU
-        beatsToPageBoundary)           // Length to end of page
 
-      val writeableBeats = bounds.reduce { (a, b) => Mux(a < b, a, b) }
+      val writeableBeats = writeBounds.reduce { (a, b) => Mux(a < b, a, b) }
       val writeableBeatsMinus1 = writeableBeats - 1.U
 
       // This register resets itself to 0 on cycles it is not set by the host
       // CPU.  If it is non-zero it was written to in the last cycle, and so we
       // know we can update credits.
-      // NB: This assumes there cannot be back-to-back MMIO accesses.
+      assert(!doneInit || (!(RegNext(bytesConsumedByCPU) =/= 0.U) || (bytesConsumedByCPU === 0.U)),
+        "Back-to-back MMIO accesses, or incorrect toggling on bytesConsumedByCPU")
       when (bytesConsumedByCPU =/= 0.U) {
-        printf("Driver Credit: %d\n", bytesConsumedByCPU)
         bytesConsumedByCPU := 0.U
         writeCredits := writeCredits + bytesConsumedByCPU
         readCredits  := readCredits - bytesConsumedByCPU
       }
 
-      // When the driver calls for a flush, write at least as many beats to the
-      // CPU as are currently avalable in the outgoingQueue. More may be written
-      // if new data is enqueued.
-      // Waiting for the FSM to go idle ensures io.count will not be decremented
-      // in elthe same cycle. Maybe not necessary?
-      when (doFlush && (state === idle)) {
-        doFlush := false.B
-        flushBeatsToIssue := outgoingQueue.io.count
-        flushBeatsToAck   := outgoingQueue.io.count
-      }
+      val doFlush, inFlush = RegInit(false.B)
+      val flushBeatsToIssue, flushBeatsToAck = RegInit(0.U(log2Ceil(cpuBufferDepthBeats+1).W))
+
 
       assert(readCredits >= bytesConsumedByCPU,
         "Driver read more bytes than available in circular buffer.")
-      assert((writeCredits + bytesConsumedByCPU) <= bufferSizeBytes.U,
+      assert((writeCredits + bytesConsumedByCPU) <= cpuBufferSizeBytes.U,
         "Driver granted more write credit than physically allowable.")
 
       switch (state) {
         is (idle) {
+          doFlush := false.B
+          when(doFlush && !inFlush && (outgoingQueue.io.count > 0.U)) {
+            inFlush := true.B
+            flushBeatsToIssue := outgoingQueue.io.count
+            flushBeatsToAck   := outgoingQueue.io.count
+          }
+          val start =
+            (inflightBeatCounts.io.enq.ready) &&
+            ((flushBeatsToIssue =/= 0.U) || (writeableBeats === beatsToPageBoundary))
+
+          when(start) { state := sendAddress }
+        }
+        is (sendAddress) {
           when(axi4.aw.fire) {
             state := sendData
             beatsToSendMinus1 := writeableBeatsMinus1
-            writePtr := writePtr + (writeableBeats * bytesPerBeat.U)
-            writeCredits := writeCredits + bytesConsumedByCPU - (writeableBeats * bytesPerBeat.U)
+            writePtr := writePtr + (writeableBeats * beatBytes.U)
+            writeCredits := writeCredits + bytesConsumedByCPU - (writeableBeats * beatBytes.U)
             flushBeatsToIssue := Mux(flushBeatsToIssue < writeableBeats, 0.U, flushBeatsToIssue - writeableBeats)
           }
         }
         is (sendData) {
           when(axi4.w.fire) {
             state := Mux(axi4.w.bits.last, idle, sendData)
-            printf("Beats to send: %d\n", beatsToSendMinus1)
             beatsToSendMinus1 := beatsToSendMinus1 - 1.U
           }
         }
       }
 
-      printf("State: %d, Read Credits: %d, Write Credits: %d, Count: %d, flushBeats: %d\n", state,readCredits, writeCredits, outgoingQueue.io.count, flushBeatsToIssue)
-
-      when(axi4.aw.fire) {
-        printf(p"PCIM AW Fire ${axi4.aw}\n")
-      }
-      when(axi4.w.fire) {
-        printf(p"PCIM W Fire ${axi4.w}\n")
-      }
-      when(axi4.b.fire) {
-        printf(p"PCIM B Fire ${axi4.b}\n")
-      }
-
-
-      axi4.aw.valid :=
-        (state === idle) &&
-        (inflightBeatCounts.io.enq.ready) &&
-        ((flushBeatsToIssue =/= 0.U) ||
-        (writeableBeats === beatsToPageBoundary))
-
-
+      axi4.aw.valid := (state === sendAddress)
       axi4.aw.bits.id    := 0.U
-      // NOTE: Transactions must not span page boundaries.
       axi4.aw.bits.addr := Cat(toHostPhysAddrHigh, toHostPhysAddrLow) + writePtr
       axi4.aw.bits.len  := writeableBeatsMinus1
-      axi4.aw.bits.size := (log2Ceil(bytesPerBeat)).U
-      // This is assumed but not exposed by the PCIM interface
+      axi4.aw.bits.size := (log2Ceil(beatBytes)).U
+      // This is assumed but not exposed by the PCIM interface, and is the
+      // default transaction type supported by XDMA-backed AXI4 IFs anyways
       axi4.aw.bits.burst := AXI4Parameters.BURST_INCR
       // This to permit intermediate width adapters, etc, to pack narrower
-      // transcations into larger ones, in the event we make this IF narrower than 512b
+      // transactions into larger ones, in the event we make this IF narrower than 512b
       axi4.aw.bits.cache := AXI4Parameters.CACHE_MODIFIABLE
       // Assume page-sized transfers for now
-      // The following are unused by AWS's PCIM IF
-      axi4.aw.bits.prot  := DontCare
-      axi4.aw.bits.qos   := DontCare
-      axi4.aw.bits.lock  := DontCare
+      // These fields are unused by F1 PCIM, but pick reasonable default values for future proofing
+      axi4.aw.bits.prot  := 0.U // Unpriviledged, secure, data access
+      axi4.aw.bits.qos   := 0.U // Default; unused
+      axi4.aw.bits.lock  := 0.U // Normal, non-exclusive
 
       inflightBeatCounts.io.enq.valid := axi4.aw.fire
       inflightBeatCounts.io.enq.bits.numBeats := writeableBeats
       inflightBeatCounts.io.enq.bits.isFlush  := flushBeatsToIssue =/= 0.U
 
-      //assert((state =/= sendData) || outgoingQueue.io.deq.valid, "Outgoing queue unexpectedly empty.")
       axi4.w.valid := (state === sendData) && outgoingQueue.io.deq.valid
       axi4.w.bits.data  := outgoingQueue.io.deq.bits
-      axi4.w.bits.strb  := ((BigInt(1) << bytesPerBeat) - 1).U
+      axi4.w.bits.strb  := ((BigInt(1) << beatBytes) - 1).U
       axi4.w.bits.last  := beatsToSendMinus1 === 0.U
       outgoingQueue.io.deq.ready := (state === sendData) && axi4.w.ready
 
       // Write Response handling
       axi4.b.ready := true.B
+
       val ackBeats = inflightBeatCounts.io.deq.bits.numBeats
       val ackFlush = inflightBeatCounts.io.deq.bits.isFlush
       when (axi4.b.fire) {
-        readCredits := readCredits + (ackBeats * bytesPerBeat.U) - bytesConsumedByCPU
+        readCredits := readCredits + (ackBeats * beatBytes.U) - bytesConsumedByCPU
         when (ackFlush) {
-          flushBeatsToAck := Mux(ackBeats < flushBeatsToAck, flushBeatsToAck - ackBeats, 0.U)
-          printf("Acking flush for %d, remaining: %d \n", ackBeats, flushBeatsToAck)
+          val remainingBeatsToAck = Mux(ackBeats < flushBeatsToAck, flushBeatsToAck - ackBeats, 0.U)
+          flushBeatsToAck := remainingBeatsToAck
+          inFlush := remainingBeatsToAck =/= 0.U
         }
       }
       inflightBeatCounts.io.deq.ready := axi4.b.fire
       assert(!axi4.b.valid || inflightBeatCounts.io.deq.valid)
 
-      // Tie-off read channel.
+      // We only use the write channels to implement FPGA-to-CPU streams
       axi4.ar.valid := false.B
       axi4.r .ready := false.B
 
       // Register Driver-programmable MMIO registers
       ToCPUStreamDriverParameters(
         chParams.name,
-        bufferSizeBytes,
-        attach(toHostPhysAddrHigh, "toHostPhysAddrHigh"),
-        attach(toHostPhysAddrLow, "toHostPhysAddrLow"),
-        attach(readCredits, "bytesAvailable", ReadOnly),
-        attach(bytesConsumedByCPU, "bytesConsumed"),
-        attach(doneInit, "toHostStreamDoneInit"),
-        attach(doFlush, "toHostStreamFlush"),
-        attach(!doFlush && (flushBeatsToAck === 0.U), "toHostStreamFlushDone", ReadOnly),
+        cpuBufferSizeBytes,
+        attach(toHostPhysAddrHigh, s"${chParams.name}_toHostPhysAddrHigh"),
+        attach(toHostPhysAddrLow,  s"${chParams.name}_toHostPhysAddrLow"),
+        attach(readCredits,        s"${chParams.name}_bytesAvailable", ReadOnly),
+        attach(bytesConsumedByCPU, s"${chParams.name}_bytesConsumed"),
+        attach(doneInit,           s"${chParams.name}_toHostStreamDoneInit"),
+        attach(doFlush,            s"${chParams.name}_toHostStreamFlush"),
+        attach(!(doFlush || inFlush), s"${chParams.name}_toHostStreamFlushDone", ReadOnly),
       )
     }
-    val axi4Bundles = toCPUNode.get.out.map(_._1)
 
-    val sourceDriverParameters = (for ((axi4IF, streamIF, params) <- (axi4Bundles, streamsToHostCPU, sourceParams).zipped) yield {
-      elaborateToHostCPUStream(streamIF, axi4IF, params)
-    }).toSeq
+
+    val sourceDriverParameters = if (hasStreams) {
+      val axi4Bundles = toCPUNode.get.out.map(_._1)
+      (for ((axi4IF, streamIF), params) <- axi4Bundles.zip(streamsToHostCPU).zip(sourceParams))) yield {
+        chisel3.experimental.prefix(params.name) {
+          elaborateToHostCPUStream(streamIF, axi4IF, params)
+        }
+      }).toSeq
+    } else {
+      Seq()
+    }
 
     genCRFile()
 

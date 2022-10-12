@@ -24,7 +24,6 @@ abstract class TestSuiteCommon extends org.scalatest.flatspec.AnyFlatSpec {
   def commonMakeArgs: Seq[String]
 
   val platformName = "f1"
-  val replayBackends = Seq("rtl")
   val platformMakeArgs = Seq(s"PLATFORM=$platformName")
 
   // Check if we are running out of Chipyard by checking for the existence of a firesim/sim directory

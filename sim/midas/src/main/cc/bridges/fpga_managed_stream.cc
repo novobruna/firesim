@@ -4,6 +4,10 @@
 #include <cstring>
 #include <iostream>
 
+void FPGAManagedStreams::FPGAToCPUDriver::init() {
+  this->mmio_write(this->params.toHostPhysAddrHighAddr, (uint32_t) (this->buffer_base_fpga >> 32));
+  this->mmio_write(this->params.toHostPhysAddrLowAddr, (uint32_t) this->buffer_base_fpga);
+}
 /**
  * @brief Dequeues as much as num_bytes of data from the associated bridge
  * stream.
@@ -42,9 +46,11 @@ size_t FPGAManagedStreams::FPGAToCPUDriver::pull(void *dest,
 
 void FPGAManagedStreams::FPGAToCPUDriver::flush() {
   this->mmio_write(this->params.toHostStreamFlushAddr, 1);
-  // TODO: Consider if this should be made non blocking // alternate API
+  // TODO: Consider if this should be made non-blocking // alternate API
   auto flush_done = false;
+  int attempts = 0;
   while (!flush_done) {
     flush_done = (this->mmio_read(this->params.toHostStreamFlushDoneAddr) & 1);
+    assert(++attempts < 256); // Bridge stream flush appears to deadlock
   }
 }

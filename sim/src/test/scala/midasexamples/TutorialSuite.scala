@@ -6,22 +6,31 @@ import scala.util.matching.Regex
 import scala.io.Source
 import org.scalatest.Suites
 import org.scalatest.matchers.should._
+import freechips.rocketchip.config.Config
+
+object BaseConfigs {
+  def f1 = Seq(classOf[DefaultF1Config])
+  def vitis = Seq(classOf[DefaultVitisConfig])
+}
 
 abstract class TutorialSuite(
     val targetName: String, // See GeneratorUtils
     targetConfigs: String = "NoConfig",
-    platformConfigs: String = "HostDebugFeatures_DefaultF1Config",
+    platformConfigs: Seq[Class[_ <: Config]] = Seq(),
     tracelen: Int = 8,
     simulationArgs: Seq[String] = Seq()
   ) extends firesim.TestSuiteCommon with Matchers {
 
+  lazy val basePlatformConfig = BaseConfigs.f1.asInstanceOf[Seq[Class[_ <: Config]]]
   val backendSimulator = "verilator"
+  def platformConfigString = (platformConfigs ++ basePlatformConfig).map(_.getSimpleName).mkString("_")
 
-  val targetTuple = s"$targetName-$targetConfigs-$platformConfigs"
+
+  val targetTuple = s"$targetName-$targetConfigs-${platformConfigString}"
   val commonMakeArgs = Seq(s"TARGET_PROJECT=midasexamples",
                            s"DESIGN=$targetName",
                            s"TARGET_CONFIG=${targetConfigs}",
-                           s"PLATFORM_CONFIG=${platformConfigs}")
+                           s"PLATFORM_CONFIG=${platformConfigString}")
 
   def run(backend: String,
           debug: Boolean = false,
@@ -181,17 +190,18 @@ abstract class TutorialSuite(
 
 //class PointerChaserF1Test extends TutorialSuite(
 //  "PointerChaser", "PointerChaserConfig", simulationArgs = Seq("`cat runtime.conf`"))
+
 class GCDF1Test extends TutorialSuite("GCD")
+class GCDVitisTest extends GCDF1Test { override lazy val basePlatformConfig = BaseConfigs.vitis }
+
 // Hijack Parity to test all of the Midas-level backends
 class ParityF1Test extends TutorialSuite("Parity") {
   runTest("verilator", true)
   runTest("vcs", true)
 }
+class ParityVitisTest extends ParityF1Test { override lazy val basePlatformConfig = BaseConfigs.vitis }
 
-class ParityVitisTest extends TutorialSuite("Parity", platformConfigs = classOf[DefaultVitisConfig].getSimpleName) {
-  runTest("verilator", true)
-  runTest("vcs", true)
-}
+
 class ShiftRegisterF1Test extends TutorialSuite("ShiftRegister")
 class ResetShiftRegisterF1Test extends TutorialSuite("ResetShiftRegister")
 class EnableShiftRegisterF1Test extends TutorialSuite("EnableShiftRegister")
@@ -215,7 +225,7 @@ class AutoCounterCoverModuleF1Test extends TutorialSuite("AutoCounterCoverModule
 }
 class AutoCounterPrintfF1Test extends TutorialSuite("AutoCounterPrintfModule",
     simulationArgs = Seq("+print-file=synthprinttest.out"),
-    platformConfigs = "AutoCounterPrintf_HostDebugFeatures_DefaultF1Config") {
+    platformConfigs = classOf[AutoCounterPrintf] +: BaseConfigs.f1) {
   diffSynthesizedLog("synthprinttest.out0", stdoutPrefix = "AUTOCOUNTER_PRINT CYCLE", synthPrefix = "CYCLE")
 }
 class AutoCounterGlobalResetConditionF1Test extends TutorialSuite("AutoCounterGlobalResetCondition",
@@ -247,11 +257,8 @@ class PrintfModuleF1Test extends TutorialSuite("PrintfModule",
   diffSynthesizedLog("synthprinttest.out0")
 }
 
-class PrintfModuleVitisTest extends TutorialSuite("PrintfModule",
-  platformConfigs = classOf[DefaultVitisConfig].getSimpleName,
-  simulationArgs = Seq("+print-no-cycle-prefix", "+print-file=synthprinttest.out")) {
-  diffSynthesizedLog("synthprinttest.out0")
-}
+class PrintfModuleVitisTest extends PrintfModuleF1Test { override lazy val basePlatformConfig = BaseConfigs.vitis }
+
 class NarrowPrintfModuleF1Test extends TutorialSuite("NarrowPrintfModule",
   simulationArgs = Seq("+print-no-cycle-prefix", "+print-file=synthprinttest.out")) {
   diffSynthesizedLog("synthprinttest.out0")
@@ -321,6 +328,8 @@ class MulticlockPrintF1Test extends TutorialSuite("MulticlockPrintfModule",
     synthLinesToDrop = 4)
 }
 
+class MulticlockPrintVitisTest extends MulticlockPrintF1Test { override lazy val basePlatformConfig = BaseConfigs.vitis }
+
 class MulticlockAutoCounterF1Test extends TutorialSuite("MulticlockAutoCounterModule",
     simulationArgs = Seq("+autocounter-readrate=1000", "+autocounter-filename-base=autocounter")) {
   checkAutoCounterCSV("autocounter0.csv", "AUTOCOUNTER_PRINT ")
@@ -363,7 +372,7 @@ class PassthroughModelBridgeSourceTest extends TutorialSuite("PassthroughModelBr
 class ResetPulseBridgeActiveHighTest extends TutorialSuite(
     "ResetPulseBridgeTest",
     // Disable assertion synthesis to rely on native chisel assertions to catch bad behavior
-    platformConfigs = "NoSynthAsserts_HostDebugFeatures_DefaultF1Config",
+    platformConfigs = classOf[NoSynthAsserts] +: BaseConfigs.f1,
     simulationArgs = Seq(s"+reset-pulse-length0=${ResetPulseBridgeTestConsts.maxPulseLength}")) {
   runTest(backendSimulator,
     args = Seq(s"+reset-pulse-length0=${ResetPulseBridgeTestConsts.maxPulseLength + 1}"),
@@ -373,7 +382,7 @@ class ResetPulseBridgeActiveHighTest extends TutorialSuite(
 class ResetPulseBridgeActiveLowTest extends TutorialSuite(
     "ResetPulseBridgeTest",
     targetConfigs = "ResetPulseBridgeActiveLowConfig",
-    platformConfigs = "NoSynthAsserts_HostDebugFeatures_DefaultF1Config",
+    platformConfigs = classOf[NoSynthAsserts] +: BaseConfigs.f1,
     simulationArgs = Seq(s"+reset-pulse-length0=${ResetPulseBridgeTestConsts.maxPulseLength}")) {
   runTest(backendSimulator,
     args = Seq(s"+reset-pulse-length0=${ResetPulseBridgeTestConsts.maxPulseLength + 1}"),
@@ -400,8 +409,7 @@ class CustomConstraintsF1Test extends TutorialSuite("CustomConstraints") {
     atLeast (1, xdc) should fullyMatch regex "constrain_impl2 \\[reg WRAPPER_INST/CL/firesim_top/.*/dut/r1]".r
   }
 }
-
-// Suite Collections
+// Midasexample Suite Collections
 class ChiselExampleDesigns extends Suites(
   new GCDF1Test,
   new ParityF1Test,
@@ -454,6 +462,14 @@ class GoldenGateMiscCITests extends Suites(
   new MultiRegF1Test
 )
 
+class VitisCITests extends Suites (
+  new GCDVitisTest,
+  new ParityVitisTest,
+  new PrintfModuleVitisTest,
+  new MulticlockPrintVitisTest,
+)
+
+
 // These groups are vestigial from CircleCI container limits
 class CIGroupA extends Suites(
   new ChiselExampleDesigns,
@@ -469,5 +485,6 @@ class CIGroupB extends Suites(
   new GoldenGateMiscCITests,
   new firesim.fasedtests.CIGroupB,
   new firesim.AllMidasUnitTests,
-  new firesim.FailingUnitTests
+  new firesim.FailingUnitTests,
+  new VitisCITests
 )

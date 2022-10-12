@@ -235,7 +235,7 @@ size_t synthesized_prints_t::process_tokens(size_t beats,
   // See FireSim issue #208
   // This needs to be page aligned, as a DMA request that spans a page is
   // fractured into a pair, and for reasons unknown, first beat of the second
-  // request is lost. Once aligned, qequests larger than a page will be
+  // request is lost. Once aligned, requests larger than a page will be
   // fractured into page-size (64-beat) requests and these seem to behave
   // correctly.
   alignas(4096) char buf[maximum_batch_bytes];

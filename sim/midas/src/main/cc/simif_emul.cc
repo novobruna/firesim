@@ -88,7 +88,9 @@ simif_emul_t::simif_emul_t() {
   }
 #endif // CPUMANAGEDSTREAMENGINE_0_PRESENT
 #ifdef FPGAMANAGEDSTREAMENGINE_0_PRESENT
-  auto driver_buffer_ptr = ((char *)cpu_mem->get_data());
+  auto fpga_address_memory_base = ((char *)cpu_mem->get_data());
+  auto offset = 0;
+
   for (size_t i = 0; i < FPGAMANAGEDSTREAMENGINE_0_to_cpu_stream_count; i++) {
     auto params = FPGAManagedStreams::StreamParameters(
         std::string(FPGAMANAGEDSTREAMENGINE_0_to_cpu_names[i]),
@@ -104,10 +106,11 @@ simif_emul_t::simif_emul_t() {
     fpga_to_cpu_streams.push_back(
         std::make_unique<FPGAManagedStreams::FPGAToCPUDriver>(
             params,
-            (void *)driver_buffer_ptr,
+            (void *)(fpga_address_memory_base + offset),
+            offset,
             mmio_read_func,
             mmio_write_func));
-    driver_buffer_ptr += params.buffer_capacity;
+    offset += params.buffer_capacity;
   }
 
 #endif // FPGAMANAGEDSTREAMENGINE_0_PRESENT
@@ -177,6 +180,12 @@ void simif_emul_t::host_init(int argc, char **argv) {
     ::tick();
   top->reset = 0;
 #endif
+  for (auto &stream : this->fpga_to_cpu_streams) {
+    stream->init();
+  }
+  for (auto &stream : this->cpu_to_fpga_streams) {
+    stream->init();
+  }
 }
 
 int simif_emul_t::host_finish() {

@@ -14,6 +14,7 @@ class NoConfig extends Config(Parameters.empty)
 class BaseMidasExamplesConfig extends Config(
   new WithDefaultMemModel ++
   new WithWiringTransform ++
+  new HostDebugFeatures ++
   new Config((site, here, up) => {
     case DesiredHostFrequency => 75
     case SynthAsserts => true

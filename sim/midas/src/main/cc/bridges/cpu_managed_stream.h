@@ -48,6 +48,7 @@ public:
   CPUManagedDriver(StreamParameters params,
                    std::function<uint32_t(size_t)> mmio_read_func)
       : params(params), mmio_read_func(mmio_read_func){};
+  virtual ~CPUManagedDriver() {};
 
 private:
   StreamParameters params;
@@ -69,7 +70,7 @@ public:
  * implemented with axi4_read, and is provided by the host-platform.
  *
  */
-class FPGAToCPUDriver : public CPUManagedDriver, public FPGAToCPUStreamDriver {
+class FPGAToCPUDriver final : public CPUManagedDriver, public FPGAToCPUStreamDriver {
 public:
   FPGAToCPUDriver(StreamParameters params,
                   std::function<uint32_t(size_t)> mmio_read,
@@ -81,6 +82,7 @@ public:
   // The CPU-managed stream engine makes all beats available to the bridge,
   // hence the NOP.
   virtual void flush() override{};
+  virtual void init() override{};
 
 private:
   std::function<size_t(size_t, char *, size_t)> axi4_read;
@@ -93,7 +95,7 @@ private:
  * FPGA out of a user-provided buffer. IO over a CPU-managed AXI4 IF is
  * implemented with axi4_write, and is provided by the host-platform.
  */
-class CPUToFPGADriver : public CPUManagedDriver, public CPUToFPGAStreamDriver {
+class CPUToFPGADriver final : public CPUManagedDriver, public CPUToFPGAStreamDriver {
 public:
   CPUToFPGADriver(StreamParameters params,
                   std::function<uint32_t(size_t)> mmio_read,
@@ -104,6 +106,7 @@ public:
   push(void *src, size_t num_bytes, size_t required_bytes) override;
   // On a push all beats are delivered to the FPGA, so a NOP is sufficient here.
   virtual void flush() override{};
+  virtual void init() override{};
 
 private:
   std::function<size_t(size_t, char *, size_t)> axi4_write;

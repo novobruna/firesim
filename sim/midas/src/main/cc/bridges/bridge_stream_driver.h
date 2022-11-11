@@ -19,4 +19,4 @@ public:
   virtual void flush() = 0;
 };
 
-#endif // __CORE_BRIDGE_STREAM_DRIVER_H
+#endif // __BRIDGES_BRIDGE_STREAM_DRIVER_H

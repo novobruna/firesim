@@ -509,3 +509,29 @@ object BRAMQueue {
   }
 }
 
+/** Instantiate an XORHash32. Each valid data will be hashed into the lfsr and a new result will be generated
+  *
+  * @param data
+  *   Input data to be hashed
+  * 
+  * @param valid
+  *   A new hash will be generaed each valid clock cycle
+  * 
+  * @param initial
+  *   The initial value of the lfsr
+  */
+object XORHash32
+{ 
+  def apply(data: UInt, valid: Bool, initial: Long = 0): UInt =
+  { 
+    val lfsr = RegInit(initial.U(32.W))
+    val stage0 = data ^ lfsr
+    val stage1 = (stage0 ^ (stage0 << 13))(31,0)
+    val stage2 = (stage1 ^ (stage1 >> 17))(31,0)
+    val stage3 = (stage2 ^ (stage2 << 5))(31,0)
+    when (valid) {
+      lfsr := stage3
+    }
+    lfsr
+  }
+}

@@ -379,6 +379,12 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
       case _ =>
     }
     bridgeMod.module.hPort.connectChannels2Port(bridgeAnno, simIo)
+    
+    // WILL connect "hasher config io" from master to all bridges
+    // bridgeMod.module.hasherConfigurationIO := master.xxx
+
+    // bridgeMod.module.hPort.tokenHashers()
+    // iterate all briges, call a method to get information related to takenhashers
   })
 
   outer.printStreamSummary(outer.toCPUStreamParams,   "Bridge Streams To CPU:")

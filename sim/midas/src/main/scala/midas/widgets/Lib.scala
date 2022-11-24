@@ -524,7 +524,7 @@ object XORHash32 {
   // The input is broken up into slices of width 32.
   val hashWidth = 32
 
-  def foldInput(data: UInt): UInt = {
+  def foldInput(data: Data): UInt = {
     val dataWidth = data.getWidth
 
     // divide with a ceiling round, to get the number of slices
@@ -536,7 +536,7 @@ object XORHash32 {
       val width = math.min(dataWidth - (x * hashWidth), hashWidth)
       val start = x * hashWidth
       val end   = x * hashWidth + width - 1
-      data(end, start)
+      data.asUInt()(end, start)
     })
 
     // XOR all of the input slices ontop of eachother to get a single
@@ -546,7 +546,7 @@ object XORHash32 {
     foldedData
   }
 
-  def apply(data: UInt, valid: Bool, initial: Long = 0): UInt = {
+  def apply(data: Data, valid: Bool, initial: Long = 0): UInt = {
     // the lfsr register
     val lfsr = RegInit(initial.U(32.W))
 

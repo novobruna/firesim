@@ -168,6 +168,12 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
       )
     })
   }
+  def tokenHashers() = {
+    println("CALLED tokenHashers from HostPort")
+    Unit
+  }
+
+  def getChannelPorts() = Seq()
 }
 
 object HostPort {

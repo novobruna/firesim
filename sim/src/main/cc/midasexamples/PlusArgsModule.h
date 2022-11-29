@@ -122,11 +122,29 @@ public:
     plusargsinator->init();
     target_reset();
 
+    PLUSARGSBRIDGEMODULE_0_substruct_create;
+    auto pa = PLUSARGSBRIDGEMODULE_0_substruct;
+
     for (int i = 0; i < 8; i++) {
       // validate before first tick and for a few after (b/c of the loop)
       validate();
 
       step(1);
+
+
+      if( i >= 0 ) {
+        std::cout << "i = " << i << "\n";
+        // auto ready = read(pa->readReadyoutChannel);
+        
+        // std::cout << "  readReadyoutChannel      " << read(pa->readReadyoutChannel) << "\n";
+        // std::cout << "  readQueueoutChannel      " << read(pa->readQueueoutChannel) << "\n";
+        // std::cout << "  readDeqReadyoutChannel   " << read(pa->readDeqReadyoutChannel) << "\n";
+        // write(pa->readDeqReadyoutChannel, 1);
+        
+        
+        std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << "\n";
+      }
+      
     }
   }
 

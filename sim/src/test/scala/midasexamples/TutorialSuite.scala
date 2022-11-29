@@ -220,12 +220,12 @@ class PlusArgsGroup68Bit extends TutorialSuite("PlusArgsModule", "PlusArgsModule
 }
 
 class PlusArgsGroup29Bit extends TutorialSuite("PlusArgsModule", "PlusArgsModuleTestConfigGroup29Bit") with PlusArgsKey {
-  it should "provide the correct default value, 1 slice" in {
-    assert(run("verilator", false, args = Seq(getKey(1,0))) == 0)
-  }
+  // it should "provide the correct default value, 1 slice" in {
+  //   assert(run("verilator", false, args = Seq(getKey(1,0))) == 0)
+  // }
 
   it should "accept an int from the command line, 1 slice" in {
-    assert(run("verilator", false, args = Seq(s"+plusar_v=${BigInt("1eadbeef", 16)}", getKey(1,1))) == 0)
+    assert(run("verilator", true, args = Seq(s"+plusar_v=${BigInt("1eadbeef", 16)}", getKey(1,1))) == 0)
   }
 }
 

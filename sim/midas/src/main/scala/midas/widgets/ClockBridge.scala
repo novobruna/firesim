@@ -132,7 +132,8 @@ class ClockTokenVector(numClocks: Int) extends Bundle with HasChannels with Cloc
     Unit
   }
 
-  def getChannelPorts() = Seq()
+  def getOutputChannelPorts() = Seq()
+  def getInputChannelPorts() = Seq()
 
   def connectChannels2Port(bridgeAnno: BridgeIOAnnotation, targetIO: TargetChannelIO): Unit =
     targetIO.clockElement._2 <> clocks

@@ -173,7 +173,8 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
     Unit
   }
 
-  def getChannelPorts() = Seq()
+  def getOutputChannelPorts() = Seq()
+  def getInputChannelPorts() = Seq()
 }
 
 object HostPort {

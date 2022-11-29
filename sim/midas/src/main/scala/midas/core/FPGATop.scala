@@ -379,6 +379,12 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
       case _ =>
     }
     bridgeMod.module.hPort.connectChannels2Port(bridgeAnno, simIo)
+
+
+    for (x <- bridgeMod.module.hashRecord) {
+      // println(f"FoundDDD ${x}")
+    }
+    
     
     // WILL connect "hasher config io" from master to all bridges
     // bridgeMod.module.hasherConfigurationIO := master.xxx
@@ -441,5 +447,8 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
    cpu_managed_axi4.map { _ => "CPU_MANAGED_AXI4_PRESENT" -> 1.toLong } ++:
    fpga_managed_axi4.map { _ => "FPGA_MANAGED_AXI4_PRESENT" -> 1.toLong } ++:
    Seq.tabulate[(String, Long)](p(HostMemNumChannels))(idx => s"MEM_HAS_CHANNEL${idx}" -> 1)
-  def genHeader(sb: StringBuilder)(implicit p: Parameters) = outer.genHeader(sb)
+  def genHeader(sb: StringBuilder)(implicit p: Parameters) = {
+    sb.append("// HeArt\n")
+    outer.genHeader(sb)
+  }
 }

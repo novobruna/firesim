@@ -14,6 +14,8 @@ import firrtl.annotations.{ReferenceTarget, ModuleTarget, JsonProtocol, HasSeria
 
 import scala.reflect.runtime.{universe => ru}
 
+import scala.collection.mutable
+
 /* Bridge
  *
  * Bridges are widgets that operate directly on token streams moving to and
@@ -40,6 +42,8 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     sb.append(genConstStatic(s"${headerWidgetName}_clock_multiplier", UInt32(mul)))
     sb.append(genConstStatic(s"${headerWidgetName}_clock_divisor", UInt32(div)))
   }
+
+  val hashRecord = mutable.ArrayBuffer[String]()
 
   override def genCRFile(): MCRFile = {
     // ------------------------------------------------------
@@ -76,15 +80,26 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
   def tokenHashers2() = {
 
-    val thelist = hPort.getChannelPorts()
 
-    thelist.map({ case ch =>
-      val name = "foo" // reverseElementMap(ch)
+    println("Entering tokenHashers2()")
+
+
+    val thelist = hPort.getOutputChannelPorts()
+    
+
+    thelist.map({ case (name,ch) =>
 
       println(s"OUTPUT Channel ${name}")
       // PipeBridgeChannel(name, meta.clockRT, meta.fieldRTs, Seq(), 0)
 
-      dontTouch(ch.ready)
+      hashRecord += name
+
+
+      for (x <- hashRecord) {
+        println(f"Found ${x}")
+      }
+
+      // dontTouch(ch.ready)
       
       val shouldHash = ch.fire
       dontTouch(shouldHash)
@@ -94,6 +109,40 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       chisel3.assert(ZZZoutputChannelHash===RegNext(ZZZoutputChannelHash))
 
       val readHash = genROReg(ZZZoutputChannelHash, s"readHash${name}")
+
+      val (counter, counterWrap) = Counter.apply(shouldHash, 256)
+
+      // val shouldHash2 = counter < 3
+
+      // val fifoDepth = 1024
+      val fifoDepth = 128
+
+      val q = Module(new BRAMQueue(fifoDepth)(UInt(32.W)))
+      q.io.enq.valid := shouldHash
+      // q.io.enq.valid := shouldHash2
+      q.io.enq.bits := counter
+      // enq.ready := q.io.enq.ready
+      // q.io.deq
+      
+      // q.io.deq.bits
+      // val readQueue = genROReg(q.io.deq.bits, s"readQueue${name}")
+      val readRdy   = genROReg(q.io.enq.ready, s"readReady${name}")
+      // val writeValid   = genWOReg(q.io.deq.valid, s"writeValid${name}")
+      // val readRdy2   = genWOReg(q.io.deq.ready, s"reeadDeqReady${name}")
+
+
+
+      // val rDataQ = Module(new MultiWidthFifo(hWidth, cWidth, 2))
+      attachDecoupledSource(q.io.deq, s"attachReadReady${name}")
+      // memNasti.r.ready := rDataQ.io.in.ready
+      // rDataQ.io.in.valid := memNasti.r.valid
+      // rDataQ.io.in.bits := memNasti.r.bits.data
+
+
+      // q.io.deq.valid 
+      // when(counter > 3.U) {
+      //   q.io.deq.valid = true.B
+      // }
 
     })
 
@@ -145,7 +194,8 @@ trait HasChannels {
     */
   def bridgeChannels(): Seq[BridgeChannel]
 
-  def getChannelPorts(): Seq[DecoupledIO[Data]]
+  def getOutputChannelPorts(): Seq[(String,DecoupledIO[Data])]
+  def getInputChannelPorts(): Seq[(String,DecoupledIO[Data])]
 
   // copy bridgeChannels
   // def tokenHashers(): Unit=Nil

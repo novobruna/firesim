@@ -127,13 +127,19 @@ trait ChannelizedHostPortIO extends HasChannels { this: Record =>
     }
   })
 
-  // def getChannelPorts() = channels.map({ case (targetField, ch, meta) =>
+  // def getOutputChannelPorts() = channels.map({ case (targetField, ch, meta) =>
   //   ch
   // })
 
   // outputs only
-  def getChannelPorts() = channels.collect({ case (targetField, ch, meta) if !meta.bridgeSunk =>
-    ch
+  def getOutputChannelPorts() = channels.collect({ case (targetField, ch, meta) if !meta.bridgeSunk =>
+    (reverseElementMap(ch), ch)
+  })
+
+
+  // inputs only
+  def getInputChannelPorts() = channels.collect({ case (targetField, ch, meta) if meta.bridgeSunk =>
+    (reverseElementMap(ch), ch)
   })
 
   // def tokenHashers() = {

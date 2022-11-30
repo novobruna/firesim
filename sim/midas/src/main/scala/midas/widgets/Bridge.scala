@@ -11,6 +11,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental.{BaseModule, Direction, ChiselAnnotation, annotate}
 import firrtl.annotations.{ReferenceTarget, ModuleTarget, JsonProtocol, HasSerializationHints}
+import freechips.rocketchip.util.WideCounter
 
 import scala.reflect.runtime.{universe => ru}
 
@@ -99,7 +100,36 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
         println(f"Found ${x}")
       }
 
-      // dontTouch(ch.ready)
+
+      // how many tokens have we seen
+      val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value
+      
+      val delay0  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay0_${name}", 16.U)
+      val delay1  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay1_${name}", 0.U)
+      
+      val triggerDelay = Cat(Seq(delay1, delay0))
+      dontTouch(triggerDelay)
+      /////////
+
+
+      val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerFrequency0_${name}", 1.U)
+      val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerFrequency1_${name}", 0.U)
+
+      val triggerFrequency = Cat(Seq(frequency1, frequency0))
+      dontTouch(triggerFrequency)
+
+
+      val triggerMatch = triggerDelay === tokenCount
+      val triggered = RegInit(false.B)
+
+      when(triggerMatch) {
+        triggered := true.B
+      }
+
+      dontTouch(triggerMatch)
+      dontTouch(triggered)
+
+
       
       val shouldHash = ch.fire
       dontTouch(shouldHash)
@@ -110,33 +140,33 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
       val readHash = genROReg(ZZZoutputChannelHash, s"readHash${name}")
 
-      val (counter, counterWrap) = Counter.apply(shouldHash, 256)
 
-      // val shouldHash2 = counter < 3
+
+      // fake hash to debug 
+      val fakeHash = WideCounter(width = 32, inhibit = !shouldHash).value
+
 
       // val fifoDepth = 1024
       val fifoDepth = 128
 
       val q = Module(new BRAMQueue(fifoDepth)(UInt(32.W)))
       q.io.enq.valid := shouldHash
-      // q.io.enq.valid := shouldHash2
-      q.io.enq.bits := counter
-      // enq.ready := q.io.enq.ready
-      // q.io.deq
-      
-      // q.io.deq.bits
-      // val readQueue = genROReg(q.io.deq.bits, s"readQueue${name}")
-      val readRdy   = genROReg(q.io.enq.ready, s"readReady${name}")
-      // val writeValid   = genWOReg(q.io.deq.valid, s"writeValid${name}")
-      // val readRdy2   = genWOReg(q.io.deq.ready, s"reeadDeqReady${name}")
+      q.io.enq.bits := fakeHash
+
+      // not needed
+      // val readRdy   = genROReg(q.io.enq.ready, s"readReady${name}")
+
 
 
 
       // val rDataQ = Module(new MultiWidthFifo(hWidth, cWidth, 2))
-      attachDecoupledSource(q.io.deq, s"attachReadReady${name}")
-      // memNasti.r.ready := rDataQ.io.in.ready
-      // rDataQ.io.in.valid := memNasti.r.valid
-      // rDataQ.io.in.bits := memNasti.r.bits.data
+      attachDecoupledSource(q.io.deq, s"queueHead_${name}")
+    
+
+      val genOccupancy = genROReg(q.io.count, s"readQueueOccupancy_${name}")
+
+      val counterLow    = genROReg(tokenCount(31,0), s"counterLow_${name}")
+      val counterHigh   = genROReg(tokenCount(63,32), s"counterHigh_${name}")
 
 
       // q.io.deq.valid 

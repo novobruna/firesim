@@ -119,11 +119,34 @@ public:
       std::cout << "No test key found, will not assert\n";
     }
 
-    plusargsinator->init();
-    target_reset();
 
     PLUSARGSBRIDGEMODULE_0_substruct_create;
     auto pa = PLUSARGSBRIDGEMODULE_0_substruct;
+
+    auto writeTrigger = [=](const uint64_t v) {
+      write(pa->triggerDelay0_outChannel, (v&0xffffffff));
+      write(pa->triggerDelay1_outChannel, ((v>>32)&0xffffffff));
+    };
+
+    auto writeFrequency = [=](const uint64_t v) {
+      write(pa->triggerFrequency0_outChannel, (v&0xffffffff));
+      write(pa->triggerFrequency1_outChannel, ((v>>32)&0xffffffff));
+    };
+
+
+
+    writeTrigger(2);
+    writeFrequency(1);
+
+
+
+    plusargsinator->init();
+
+
+
+
+    target_reset();
+
 
     for (int i = 0; i < 8; i++) {
       // validate before first tick and for a few after (b/c of the loop)
@@ -141,8 +164,18 @@ public:
         // std::cout << "  readDeqReadyoutChannel   " << read(pa->readDeqReadyoutChannel) << "\n";
         // write(pa->readDeqReadyoutChannel, 1);
         
-        
-        std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << "\n";
+        // if( i > 4) {
+        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
+        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
+        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
+        // }
+
+        uint32_t occupancy = read(pa->readQueueOccupancy_outChannel);
+        std::cout << "  readQueueOccupancy_outChannel   " << occupancy << std::endl;
+
+        for(uint32_t i = 0; i < occupancy; i++) {
+          std::cout << "  queueHead_outChannel   " << read(pa->queueHead_outChannel) << std::endl;
+        }
       }
       
     }

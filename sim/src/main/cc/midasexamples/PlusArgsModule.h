@@ -128,15 +128,15 @@ public:
       write(pa->triggerDelay1_outChannel, ((v>>32)&0xffffffff));
     };
 
-    auto writeFrequency = [=](const uint64_t v) {
+    auto writePeriod = [=](const uint64_t v) {
       write(pa->triggerFrequency0_outChannel, (v&0xffffffff));
       write(pa->triggerFrequency1_outChannel, ((v>>32)&0xffffffff));
     };
 
 
 
-    writeTrigger(2);
-    writeFrequency(1);
+    writeTrigger(2); // cycles of hashes to delay before first sample
+    writePeriod(1);  // cycles between hashes
 
 
 
@@ -155,20 +155,8 @@ public:
       step(1);
 
 
-      if( i >= 0 ) {
+      if( true ) {
         std::cout << "i = " << i << "\n";
-        // auto ready = read(pa->readReadyoutChannel);
-        
-        // std::cout << "  readReadyoutChannel      " << read(pa->readReadyoutChannel) << "\n";
-        // std::cout << "  readQueueoutChannel      " << read(pa->readQueueoutChannel) << "\n";
-        // std::cout << "  readDeqReadyoutChannel   " << read(pa->readDeqReadyoutChannel) << "\n";
-        // write(pa->readDeqReadyoutChannel, 1);
-        
-        // if( i > 4) {
-        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
-        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
-        //   std::cout << "  attachReadReadyoutChannel   " << read(pa->attachReadReadyoutChannel) << std::endl;
-        // }
 
         uint32_t occupancy = read(pa->readQueueOccupancy_outChannel);
         std::cout << "  readQueueOccupancy_outChannel   " << occupancy << std::endl;

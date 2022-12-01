@@ -45,6 +45,11 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     sb.append(genConstStatic(s"${headerWidgetName}_clock_divisor", UInt32(div)))
   }
 
+  // make a token hasher control bundle
+
+  // val tokenHasherControlIO = IO[new myTokenhasherControlBundleType]
+
+  // only use for meta data
   val hashRecord = mutable.ArrayBuffer[String]()
 
   override def genCRFile(): MCRFile = {
@@ -73,6 +78,19 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     // delay and frequency per clock domain
     //   emitClockDomainInfo
 
+    // add a new field / case class to parameters
+    // (name of field should end in "key")
+    // type of the key is Field[Option[TokenHasherParams]]
+    //   inside should be fifo depths
+    //   counter widths?
+    //   hash vs counter operation
+
+    // one test with at least multiple bridges
+    // test both directions
+
+    // a peek poke bridge in loopback will test token hashers in both directions
+
+
     // ------------------------------------------------------
 
     tokenHashers2()
@@ -90,6 +108,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     
 
     thelist.map({ case (name,ch) =>
+      
 
       val USE_COUNTER_FOR_HASH: Boolean = true
 
@@ -111,6 +130,8 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       val delay1  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay1_${name}", 0.U)
       
       val triggerDelay = Cat(Seq(delay1, delay0))
+
+      // add triggerDelay, triggerFrequency to the io port of the module
       
       /////////
 
@@ -135,16 +156,17 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       val (periodCount: UInt, periodCountOverflow) = Counter.apply(Range(0, 2147483647, 1), enable=ch.fire, reset=periodCountReset)
       // val (periodCount: UInt, periodCountOverflow) = Counter.apply(Range(0, 2147483647, 1), enable=true.B, reset=periodCountReset)
 
-      val periodMatchUndelay = periodCount === triggerFrequency(30, 0)
-      val periodMatch = RegNext(periodMatchUndelay) && !RegNext(RegNext(periodMatchUndelay))
-      
+      val periodMatch = periodCount === triggerFrequency(30, 0)
 
       // lazy val periodCountReset: Bool = (delayMatch | periodMatch)
       when(delayMatch | periodMatch) {
-        periodCountReset := true.B
+        periodCountReset := true.B & ch.fire
       }.otherwise{
         periodCountReset := false.B
       }
+
+      // val periodOK = periodCount === 0.U
+      val periodOK = periodCountReset
 
 
       // only set triggerStart when the delay counter matches
@@ -159,7 +181,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       
       
       // val shouldHash = ch.fire
-      val shouldHash = periodCountReset & triggerStart
+      val shouldHash = periodOK & triggerStart
       // val shouldHash = RegNext(shouldHashUndelay)
       
 
@@ -180,6 +202,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       // val fifoDepth = 1024
       val fifoDepth = 128
 
+      // 36K bits (32K usable bits)
       val q = Module(new BRAMQueue(fifoDepth)(UInt(32.W)))
       q.io.enq.valid := shouldHash
       q.io.enq.bits := useHash
@@ -210,6 +233,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       dontTouch(chFire)
       dontTouch(shouldHash)
       dontTouch(fakeHash)
+      dontTouch(periodOK)
 
       // q.io.deq.valid 
       // when(counter > 3.U) {

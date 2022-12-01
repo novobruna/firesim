@@ -384,14 +384,18 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     bridgeMod.module.hPort.connectChannels2Port(bridgeAnno, simIo)
 
 
-    for (x <- bridgeMod.module.hashRecord) {
-      // println(f"FoundDDD ${x}")
+    for (meta <- bridgeMod.module.hashRecord) {
+      println(f"FoundDDD")
+      println(meta)
     }
 
     // Connect "hasher config io" from master to all bridges
     bridgeMod.module.tokenHasherControlIO.triggerDelay := hashMaster.module.io.triggerDelay
     bridgeMod.module.tokenHasherControlIO.triggerPeriod := hashMaster.module.io.triggerPeriod
-    
+
+    println("BASE")
+    println(outer.getBaseAddr(bridgeMod))
+
     // outer.addrMap
     // println(addrMap(name).start)
     

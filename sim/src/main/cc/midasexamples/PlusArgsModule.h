@@ -161,7 +161,7 @@ public:
       if( true ) {
         std::cout << "i = " << i << "\n";
 
-        uint32_t occupancy = read(pa->readQueueOccupancy_outChannel);
+        uint32_t occupancy = read(pa->queueOccupancy_outChannel);
         std::cout << "  readQueueOccupancy_outChannel   " << occupancy << std::endl;
 
         for(uint32_t i = 0; i < occupancy; i++) {

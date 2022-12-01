@@ -37,14 +37,22 @@ class TokenHasherControlBundle extends Bundle {
 }
 
 case class TokenHasherMeta(
-  bridgeName:    String,  // the name of bridge
-  name:      String,      // the name of the channel
-  output:    Boolean,     // true if this is an output port
-  queueHead: Int,         // local MMIO address of the queue head
-  queueOccupancy: Int,
-  tokenCount0:    Int,
-  tokenCount1:    Int
-)
+  bridgeName:     String,  // the name of bridge
+  name:           String,  // the name of the channel
+  output:         Boolean, // true if this is an output port
+  queueHead:      BigInt,  // MMIO address of the queue head
+  queueOccupancy: BigInt,
+  tokenCount0:    BigInt,
+  tokenCount1:    BigInt
+) {
+  def offset(base: BigInt): TokenHasherMeta = {
+    return new TokenHasherMeta(bridgeName, name, output, 
+    base + queueHead,
+    base + queueOccupancy,
+    base + tokenCount0,
+    base + tokenCount1);
+  }
+}
 
 abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     (wrapper: BridgeModule[_ <: HostPortType])
@@ -62,7 +70,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
   val tokenHasherControlIO = IO(new TokenHasherControlBundle())
 
   // only use for meta data
-  val hashRecord = mutable.ArrayBuffer[String]()
+  val hashRecord = mutable.ArrayBuffer[TokenHasherMeta]()
 
   override def genCRFile(): MCRFile = {
     // ------------------------------------------------------
@@ -104,13 +112,13 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
 
     // ------------------------------------------------------
+    tokenHashers2(name)
 
-    tokenHashers2()
-
+    
     super.genCRFile()
   }
 
-  def tokenHashers2() = {
+  def tokenHashers2(bridgeName: String) = {
 
 
     println("Entering tokenHashers2()")
@@ -127,12 +135,12 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       println(s"OUTPUT Channel ${name}")
       // PipeBridgeChannel(name, meta.clockRT, meta.fieldRTs, Seq(), 0)
 
-      hashRecord += name
+      // hashRecord += name
 
 
-      for (x <- hashRecord) {
-        println(f"Found ${x}")
-      }
+      // for (x <- hashRecord) {
+      //   println(f"Found ${x}")
+      // }
 
 
       // how many tokens have we seen
@@ -205,21 +213,19 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       q.io.enq.valid := shouldHash
       q.io.enq.bits := useHash
 
-      // not needed
-      // val readRdy   = genROReg(q.io.enq.ready, s"readReady${name}")
+      val queueHead = attachDecoupledSource(q.io.deq, s"queueHead_${name}")
 
+      val occupanyName = s"queueOccupancy_${name}"
+      val counter0Name = s"tokenCount0_${name}"
+      val counter1Name = s"tokenCount1_${name}"
 
+      val occupancyReg = genROReg(q.io.count, occupanyName)
+      val counterLow   = genROReg(tokenCount(31,0), counter0Name)
+      val counterHigh  = genROReg(tokenCount(63,32), counter1Name)
+      
+      val meta = TokenHasherMeta(bridgeName, name, true, queueHead, getCRAddr(occupanyName), getCRAddr(counter0Name), getCRAddr(counter1Name))
 
-
-      // val rDataQ = Module(new MultiWidthFifo(hWidth, cWidth, 2))
-      attachDecoupledSource(q.io.deq, s"queueHead_${name}")
-    
-
-      val genOccupancy = genROReg(q.io.count, s"readQueueOccupancy_${name}")
-
-      val counterLow    = genROReg(tokenCount(31,0), s"counterLow_${name}")
-      val counterHigh   = genROReg(tokenCount(63,32), s"counterHigh_${name}")
-
+      hashRecord += meta
 
       dontTouch(ZZZoutputChannelHash)
       dontTouch(triggerDelay)

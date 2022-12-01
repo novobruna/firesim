@@ -129,14 +129,14 @@ public:
     };
 
     auto writePeriod = [=](const uint64_t v) {
-      write(pa->triggerFrequency0_outChannel, (v&0xffffffff));
-      write(pa->triggerFrequency1_outChannel, ((v>>32)&0xffffffff));
+      write(pa->triggerPeriod0_outChannel, (v&0xffffffff));
+      write(pa->triggerPeriod1_outChannel, ((v>>32)&0xffffffff));
     };
 
 
 
-    writeTrigger(2); // cycles of hashes to delay before first sample
-    writePeriod(1);  // cycles between hashes
+    writeTrigger(1); // cycles of hashes to delay before first sample
+    writePeriod(0);  // cycles between hashes
 
 
 

@@ -31,6 +31,11 @@ abstract class BridgeModule[HostPortType <: Record with HasChannels]()(implicit 
   def module: BridgeModuleImp[HostPortType]
 }
 
+class TokenHasherControlBundle extends Bundle {
+  // val data_last = Bool()
+  // val ready = Bool()
+  // val valid = Bool()
+}
 
 abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     (wrapper: BridgeModule[_ <: HostPortType])
@@ -136,8 +141,8 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       /////////
 
 
-      val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerFrequency0_${name}", 1.U)
-      val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerFrequency1_${name}", 0.U)
+      val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod0_${name}", 1.U)
+      val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod1_${name}", 0.U)
 
       val triggerFrequency = Cat(Seq(frequency1, frequency0))
       
@@ -165,7 +170,6 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
         periodCountReset := false.B
       }
 
-      // val periodOK = periodCount === 0.U
       val periodOK = periodCountReset
 
 

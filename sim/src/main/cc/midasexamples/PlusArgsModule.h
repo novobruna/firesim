@@ -120,24 +120,27 @@ public:
     }
 
 
-    PLUSARGSBRIDGEMODULE_0_substruct_create;
-    auto pa = PLUSARGSBRIDGEMODULE_0_substruct;
+    TOKENHASHMASTER_0_substruct_create;
+    auto thm = TOKENHASHMASTER_0_substruct;
 
-    auto writeTrigger = [=](const uint64_t v) {
-      write(pa->triggerDelay0_outChannel, (v&0xffffffff));
-      write(pa->triggerDelay1_outChannel, ((v>>32)&0xffffffff));
+    auto writeDelay = [=](const uint64_t v) {
+      write(thm->triggerDelay0_TokenHashMaster, (v&0xffffffff));
+      write(thm->triggerDelay1_TokenHashMaster, ((v>>32)&0xffffffff));
     };
 
     auto writePeriod = [=](const uint64_t v) {
-      write(pa->triggerPeriod0_outChannel, (v&0xffffffff));
-      write(pa->triggerPeriod1_outChannel, ((v>>32)&0xffffffff));
+      write(thm->triggerPeriod0_TokenHashMaster, (v&0xffffffff));
+      write(thm->triggerPeriod1_TokenHashMaster, ((v>>32)&0xffffffff));
     };
 
-
-
-    writeTrigger(1); // cycles of hashes to delay before first sample
+    writeDelay(0); // cycles of hashes to delay before first sample
     writePeriod(0);  // cycles between hashes
 
+
+
+
+    PLUSARGSBRIDGEMODULE_0_substruct_create;
+    auto pa = PLUSARGSBRIDGEMODULE_0_substruct;
 
 
     plusargsinator->init();

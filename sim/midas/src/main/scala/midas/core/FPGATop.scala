@@ -130,6 +130,8 @@ class FPGATop(implicit p: Parameters) extends LazyModule with HasWidgets {
     "Simulation control bus must be 32-bits wide per AXI4-lite specification")
   val master = addWidget(new SimulationMaster)
 
+  val hashMaster = addWidget(new TokenHashMaster)
+
   val bridgeAnnos = p(SimWrapperKey).annotations collect { case ba: BridgeIOAnnotation => ba }
   val bridgeModuleMap: ListMap[BridgeIOAnnotation, BridgeModule[_ <: Record with HasChannels]] = 
     ListMap((bridgeAnnos.map(anno => anno -> addWidget(anno.elaborateWidget))):_*)
@@ -337,6 +339,7 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
   HostClockSource.annotate(clock)
 
   val master  = outer.master
+  val hashMaster  = outer.hashMaster
 
   val ctrl = IO(Flipped(WidgetMMIO()))
   val mem = IO(Vec(p(HostMemNumChannels), AXI4Bundle(p(HostMemChannelKey).axi4BundleParams)))
@@ -384,6 +387,9 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     for (x <- bridgeMod.module.hashRecord) {
       // println(f"FoundDDD ${x}")
     }
+
+    bridgeMod.module.tokenHasherControlIO.triggerDelay := hashMaster.module.io.triggerDelay
+    bridgeMod.module.tokenHasherControlIO.triggerPeriod := hashMaster.module.io.triggerPeriod
     
     
     // WILL connect "hasher config io" from master to all bridges

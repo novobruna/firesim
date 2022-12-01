@@ -32,9 +32,8 @@ abstract class BridgeModule[HostPortType <: Record with HasChannels]()(implicit 
 }
 
 class TokenHasherControlBundle extends Bundle {
-  // val data_last = Bool()
-  // val ready = Bool()
-  // val valid = Bool()
+  val triggerDelay = Input(UInt(64.W))
+  val triggerPeriod = Input(UInt(64.W))
 }
 
 abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
@@ -52,7 +51,9 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
   // make a token hasher control bundle
 
+  val tokenHasherControlIO = IO(new TokenHasherControlBundle())
   // val tokenHasherControlIO = IO[new myTokenhasherControlBundleType]
+  // val io = IO(new UARTBridgeTargetIO(uParams))
 
   // only use for meta data
   val hashRecord = mutable.ArrayBuffer[String]()
@@ -131,21 +132,24 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       // how many tokens have we seen
       val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value
       
-      val delay0  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay0_${name}", 16.U)
-      val delay1  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay1_${name}", 0.U)
+      // val delay0  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay0_${name}", 16.U)
+      // val delay1  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay1_${name}", 0.U)
       
-      val triggerDelay = Cat(Seq(delay1, delay0))
+      // val triggerDelay = Cat(Seq(delay1, delay0))
 
       // add triggerDelay, triggerFrequency to the io port of the module
       
       /////////
 
 
-      val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod0_${name}", 1.U)
-      val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod1_${name}", 0.U)
+      // val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod0_${name}", 1.U)
+      // val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod1_${name}", 0.U)
 
-      val triggerFrequency = Cat(Seq(frequency1, frequency0))
+      // val triggerFrequency = Cat(Seq(frequency1, frequency0))
+
       
+      val triggerDelay = tokenHasherControlIO.triggerDelay
+      val triggerFrequency = tokenHasherControlIO.triggerPeriod
 
 
       val delayMatchMulti = triggerDelay === tokenCount

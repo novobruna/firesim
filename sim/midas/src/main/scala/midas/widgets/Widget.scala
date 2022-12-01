@@ -281,18 +281,6 @@ trait HasWidgets {
     widgets foreach ((w: Widget) => println(w.getWName))
   }
 
-  def getCRAddr(wName: String, crName: String)(implicit channelWidth: Int): BigInt = {
-    val widget = name2inst.get(wName).getOrElse(
-      throw new RuntimeException("Could not find Widget: $wName"))
-    getCRAddr(widget, crName)
-  }
-
-  def getCRAddr(w: Widget, crName: String)(implicit channelWidth: Int): BigInt = {
-    // TODO: Deal with byte vs word addresses && don't use a name in the hash?
-    val base = (addrMap(w.getWName).start >> log2Up(channelWidth/8))
-    base + w.getCRAddr(crName)
-  }
-
   /**
     * Iterates through all bound widgets requesting default plusArgs if
     * applicable, which are then serialized to a file.  This is mostly useful

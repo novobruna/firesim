@@ -36,6 +36,16 @@ class TokenHasherControlBundle extends Bundle {
   val triggerPeriod = Input(UInt(64.W))
 }
 
+case class TokenHasherMeta(
+  bridgeName:    String,  // the name of bridge
+  name:      String,      // the name of the channel
+  output:    Boolean,     // true if this is an output port
+  queueHead: Int,         // local MMIO address of the queue head
+  queueOccupancy: Int,
+  tokenCount0:    Int,
+  tokenCount1:    Int
+)
+
 abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     (wrapper: BridgeModule[_ <: HostPortType])
     (implicit p: Parameters) extends WidgetImp(wrapper) {
@@ -49,11 +59,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     sb.append(genConstStatic(s"${headerWidgetName}_clock_divisor", UInt32(div)))
   }
 
-  // make a token hasher control bundle
-
   val tokenHasherControlIO = IO(new TokenHasherControlBundle())
-  // val tokenHasherControlIO = IO[new myTokenhasherControlBundleType]
-  // val io = IO(new UARTBridgeTargetIO(uParams))
 
   // only use for meta data
   val hashRecord = mutable.ArrayBuffer[String]()
@@ -131,22 +137,6 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
       // how many tokens have we seen
       val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value
-      
-      // val delay0  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay0_${name}", 16.U)
-      // val delay1  = genWORegInit(Wire(UInt(32.W)), s"triggerDelay1_${name}", 0.U)
-      
-      // val triggerDelay = Cat(Seq(delay1, delay0))
-
-      // add triggerDelay, triggerFrequency to the io port of the module
-      
-      /////////
-
-
-      // val frequency0 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod0_${name}", 1.U)
-      // val frequency1 = genWORegInit(Wire(UInt(32.W)), s"triggerPeriod1_${name}", 0.U)
-
-      // val triggerFrequency = Cat(Seq(frequency1, frequency0))
-
       
       val triggerDelay = tokenHasherControlIO.triggerDelay
       val triggerFrequency = tokenHasherControlIO.triggerPeriod

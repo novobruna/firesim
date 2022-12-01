@@ -388,13 +388,13 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
       // println(f"FoundDDD ${x}")
     }
 
+    // Connect "hasher config io" from master to all bridges
     bridgeMod.module.tokenHasherControlIO.triggerDelay := hashMaster.module.io.triggerDelay
     bridgeMod.module.tokenHasherControlIO.triggerPeriod := hashMaster.module.io.triggerPeriod
     
+    // outer.addrMap
+    // println(addrMap(name).start)
     
-    // WILL connect "hasher config io" from master to all bridges
-    // bridgeMod.module.hasherConfigurationIO := master.xxx
-
     // bridgeMod.module.hPort.tokenHashers()
     // iterate all briges, call a method to get information related to takenhashers
   })

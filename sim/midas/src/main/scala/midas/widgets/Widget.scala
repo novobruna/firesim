@@ -270,6 +270,20 @@ trait HasWidgets {
   }
 
   /**
+    * Get the base address for a widget
+    */
+  def getBaseAddr(w: Widget): BigInt = {
+    getBaseAddr(w.getWName)
+  }
+
+  /**
+    * Get the base address for a widget using it's name
+    */
+  def getBaseAddr(widgetName: String): BigInt = {
+    addrMap(widgetName).start
+  }
+
+  /**
     * Iterates through each bridge, generating the header fragment. Must be
     * called after bridge address assignment is complete.
     */

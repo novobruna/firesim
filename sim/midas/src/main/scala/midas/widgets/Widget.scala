@@ -45,8 +45,7 @@ abstract class Widget()(implicit p: Parameters) extends LazyModule()(p) {
 
   // Returns widget-relative word address
   def getCRAddr(name: String): Int = {
-    module.crRegistry.lookupAddress(name).getOrElse(
-      throw new RuntimeException(s"Could not find CR:${name} in widget: $wName"))
+     module.getCRAddr(name)
   }
 
   def headerComment(sb: StringBuilder) {
@@ -193,6 +192,13 @@ abstract class WidgetImp(wrapper: Widget) extends LazyModuleImp(wrapper) {
     crRegistry.genArrayHeader(wrapper.getWName.toUpperCase, base, sb)
     wrapper.getHeaderFragments(base).foreach { sb.append }
   }
+
+  // Returns widget-relative word address
+  def getCRAddr(name: String): Int = {
+    crRegistry.lookupAddress(name).getOrElse(
+      throw new RuntimeException(s"Could not find address for name: '${name}' in widget: '${wrapper.wName}'"))
+  }
+
 }
 
 object Widget {

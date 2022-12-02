@@ -375,11 +375,11 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
 
   val hashSb: StringBuilder = new StringBuilder()
   val hashNames          = mutable.ArrayBuffer[String]()
-  val hashOutput         = mutable.ArrayBuffer[Boolean]()
-  val hashQueueHead      = mutable.ArrayBuffer[BigInt]()
-  val hashQueueOccupancy = mutable.ArrayBuffer[BigInt]()
-  val hashtokenCount0    = mutable.ArrayBuffer[BigInt]()
-  val hashtokenCount1    = mutable.ArrayBuffer[BigInt]()
+  val hashOutput         = mutable.ArrayBuffer[Int]()
+  val hashQueueHead      = mutable.ArrayBuffer[Int]()
+  val hashQueueOccupancy = mutable.ArrayBuffer[Int]()
+  val hashtokenCount0    = mutable.ArrayBuffer[Int]()
+  val hashtokenCount1    = mutable.ArrayBuffer[Int]()
   // hashSb.append("hi")
   // hashSb.append("hello")
 
@@ -400,10 +400,16 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     for (meta <- bridgeMod.module.hashRecord) {
       val mOffset = meta.offset(base)
       hashNames += s"${mOffset.bridgeName}_${mOffset.name}"
-      hashOutput += mOffset.output
-      hashQueueHead += mOffset.queueHead
-      hashtokenCount0 += mOffset.tokenCount0
-      hashtokenCount1 += mOffset.tokenCount1
+      if(mOffset.output) {
+        hashOutput += 1
+       } else {
+        hashOutput += 0
+      }
+      
+      hashQueueHead += mOffset.queueHead.toInt
+      hashQueueOccupancy += mOffset.queueOccupancy.toInt
+      hashtokenCount0 += mOffset.tokenCount0.toInt
+      hashtokenCount1 += mOffset.tokenCount1.toInt
       println(hashSb)
       println(f"FoundDDD")
       println(meta)
@@ -425,11 +431,45 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
 
   hashSb.append(
     genArray(
-      "tokenhash_names",
+      "TOKENHASH_NAMES",
       hashNames.map(CStrLit(_))
     )
   )
 
+  hashSb.append(
+    genArray(
+      "TOKENHASH_OUTPUTS",
+      hashOutput.map(UInt32(_))
+    )
+  )
+
+  hashSb.append(
+    genArray(
+      "TOKENHASH_QUEUEHEADS",
+      hashQueueHead.map(UInt32(_))
+    )
+  )
+
+  hashSb.append(
+    genArray(
+      "TOKENHASH_QUEUEOCCUPANCIES",
+      hashQueueOccupancy.map(UInt32(_))
+    )
+  )
+
+  hashSb.append(
+    genArray(
+      "TOKENHASH_TOKENCOUNTS0",
+      hashtokenCount0.map(UInt32(_))
+    )
+  )
+
+  hashSb.append(
+    genArray(
+      "TOKENHASH_TOKENCOUNTS1",
+      hashtokenCount1.map(UInt32(_))
+    )
+  )
 
   outer.printStreamSummary(outer.toCPUStreamParams,   "Bridge Streams To CPU:")
   outer.printStreamSummary(outer.fromCPUStreamParams, "Bridge Streams From CPU:")

@@ -124,10 +124,15 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     println(s"Entering tokenHashers2(${bridgeName})")
 
 
-    val thelist = hPort.getOutputChannelPorts()
-    
+    tokenHashersDirection(bridgeName, hPort.getOutputChannelPorts(), true)
+    tokenHashersDirection(bridgeName, hPort.getInputChannelPorts(), false)
 
-    thelist.map({ case (name,ch) =>
+    Unit  
+  }
+
+  def tokenHashersDirection(bridgeName: String, list: Seq[(String,DecoupledIO[Data])], output: Boolean) = {
+
+    list.map({ case (name,ch) =>
       
 
       val USE_COUNTER_FOR_HASH: Boolean = true
@@ -214,7 +219,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       val counterLow   = genROReg(tokenCount(31,0), counter0Name)
       val counterHigh  = genROReg(tokenCount(63,32), counter1Name)
       
-      val meta = TokenHasherMeta(bridgeName, name, true, queueHead, getCRAddr(occupanyName), getCRAddr(counter0Name), getCRAddr(counter1Name))
+      val meta = TokenHasherMeta(bridgeName, name, output, queueHead, getCRAddr(occupanyName), getCRAddr(counter0Name), getCRAddr(counter1Name))
 
       hashRecord += meta
 

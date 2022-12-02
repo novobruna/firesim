@@ -121,7 +121,7 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
   def tokenHashers2(bridgeName: String) = {
 
 
-    println("Entering tokenHashers2()")
+    println(s"Entering tokenHashers2(${bridgeName})")
 
 
     val thelist = hPort.getOutputChannelPorts()
@@ -133,15 +133,6 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
       val USE_COUNTER_FOR_HASH: Boolean = true
 
       println(s"OUTPUT Channel ${name}")
-      // PipeBridgeChannel(name, meta.clockRT, meta.fieldRTs, Seq(), 0)
-
-      // hashRecord += name
-
-
-      // for (x <- hashRecord) {
-      //   println(f"Found ${x}")
-      // }
-
 
       // how many tokens have we seen
       val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value

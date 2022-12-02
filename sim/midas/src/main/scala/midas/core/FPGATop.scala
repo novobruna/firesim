@@ -16,6 +16,7 @@ import freechips.rocketchip.util.{DecoupledHelper, HeterogeneousBag}
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import CppGenerationUtils._
 
 /**
   * The following [[Field]]s capture the parameters of the four AXI4 bus types
@@ -372,6 +373,16 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
   val sim = Module(new SimWrapper(p(SimWrapperKey)))
   val simIo = sim.channelPorts
 
+  val hashSb: StringBuilder = new StringBuilder()
+  val hashNames          = mutable.ArrayBuffer[String]()
+  val hashOutput         = mutable.ArrayBuffer[Boolean]()
+  val hashQueueHead      = mutable.ArrayBuffer[BigInt]()
+  val hashQueueOccupancy = mutable.ArrayBuffer[BigInt]()
+  val hashtokenCount0    = mutable.ArrayBuffer[BigInt]()
+  val hashtokenCount1    = mutable.ArrayBuffer[BigInt]()
+  // hashSb.append("hi")
+  // hashSb.append("hello")
+
   // Instantiate bridge widgets.
   outer.bridgeModuleMap.map({ case (bridgeAnno, bridgeMod) =>
     val widgetChannelPrefix = s"${bridgeAnno.target.ref}"
@@ -384,7 +395,16 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     bridgeMod.module.hPort.connectChannels2Port(bridgeAnno, simIo)
 
 
+    val base = outer.getBaseAddr(bridgeMod)
+
     for (meta <- bridgeMod.module.hashRecord) {
+      val mOffset = meta.offset(base)
+      hashNames += s"${mOffset.bridgeName}_${mOffset.name}"
+      hashOutput += mOffset.output
+      hashQueueHead += mOffset.queueHead
+      hashtokenCount0 += mOffset.tokenCount0
+      hashtokenCount1 += mOffset.tokenCount1
+      println(hashSb)
       println(f"FoundDDD")
       println(meta)
     }
@@ -402,6 +422,14 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     // bridgeMod.module.hPort.tokenHashers()
     // iterate all briges, call a method to get information related to takenhashers
   })
+
+  hashSb.append(
+    genArray(
+      "tokenhash_names",
+      hashNames.map(CStrLit(_))
+    )
+  )
+
 
   outer.printStreamSummary(outer.toCPUStreamParams,   "Bridge Streams To CPU:")
   outer.printStreamSummary(outer.fromCPUStreamParams, "Bridge Streams From CPU:")
@@ -459,6 +487,7 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
    Seq.tabulate[(String, Long)](p(HostMemNumChannels))(idx => s"MEM_HAS_CHANNEL${idx}" -> 1)
   def genHeader(sb: StringBuilder)(implicit p: Parameters) = {
     sb.append("// HeArt\n")
+    sb.append(hashSb)
     outer.genHeader(sb)
   }
 }

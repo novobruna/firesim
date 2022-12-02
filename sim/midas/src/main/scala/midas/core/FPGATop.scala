@@ -374,7 +374,8 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
   val simIo = sim.channelPorts
 
   val hashSb: StringBuilder = new StringBuilder()
-  val hashNames          = mutable.ArrayBuffer[String]()
+  val hashBridgeName     = mutable.ArrayBuffer[String]()
+  val hashName           = mutable.ArrayBuffer[String]()
   val hashOutput         = mutable.ArrayBuffer[Int]()
   val hashQueueHead      = mutable.ArrayBuffer[Int]()
   val hashQueueOccupancy = mutable.ArrayBuffer[Int]()
@@ -399,7 +400,8 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
 
     for (meta <- bridgeMod.module.hashRecord) {
       val mOffset = meta.offset(base)
-      hashNames += s"${mOffset.bridgeName}_${mOffset.name}"
+      hashBridgeName += mOffset.bridgeName
+      hashName += mOffset.name
       if(mOffset.output) {
         hashOutput += 1
        } else {
@@ -429,12 +431,19 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     // iterate all briges, call a method to get information related to takenhashers
   })
 
-  hashSb.append(genConstStatic("TOKENHASH_COUNT", UInt32(hashNames.length)))
+  hashSb.append(genConstStatic("TOKENHASH_COUNT", UInt32(hashName.length)))
+
+  hashSb.append(
+    genArray(
+      "TOKENHASH_BRIDGENAMES",
+      hashBridgeName.map(CStrLit(_))
+    )
+  )
 
   hashSb.append(
     genArray(
       "TOKENHASH_NAMES",
-      hashNames.map(CStrLit(_))
+      hashName.map(CStrLit(_))
     )
   )
 

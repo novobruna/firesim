@@ -179,7 +179,7 @@ public:
   void print_simulation_performance_summary();
 
 public:
-  simif_token_hashers* token_hashers = 0;
+  simif_token_hashers_t* token_hashers = 0;
 };
 
 #endif // __SIMIF_H

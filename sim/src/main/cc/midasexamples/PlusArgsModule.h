@@ -120,23 +120,7 @@ public:
     }
 
 
-    TOKENHASHMASTER_0_substruct_create;
-    auto thm = TOKENHASHMASTER_0_substruct;
-
-    auto writeDelay = [=](const uint64_t v) {
-      write(thm->triggerDelay0_TokenHashMaster, (v&0xffffffff));
-      write(thm->triggerDelay1_TokenHashMaster, ((v>>32)&0xffffffff));
-    };
-
-    auto writePeriod = [=](const uint64_t v) {
-      write(thm->triggerPeriod0_TokenHashMaster, (v&0xffffffff));
-      write(thm->triggerPeriod1_TokenHashMaster, ((v>>32)&0xffffffff));
-    };
-
-    writeDelay(0); // cycles of hashes to delay before first sample
-    writePeriod(0);  // cycles between hashes
-
-
+    token_hashers->set_params(0,0);
 
 
     PLUSARGSBRIDGEMODULE_0_substruct_create;
@@ -151,14 +135,14 @@ public:
     target_reset();
 
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 1024; i++) {
       // validate before first tick and for a few after (b/c of the loop)
       validate();
 
       step(1);
 
 
-      if( true ) {
+      if( false ) {
         std::cout << "i = " << i << "\n";
 
         uint32_t occupancy = read(pa->queueOccupancy_outChannel);
@@ -170,6 +154,10 @@ public:
       }
       
     }
+
+    // token_hashers->get();
+    token_hashers->print();
+
   }
 
 private:

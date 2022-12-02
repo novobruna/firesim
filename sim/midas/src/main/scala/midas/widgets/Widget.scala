@@ -294,7 +294,7 @@ trait HasWidgets {
     * called after bridge address assignment is complete.
     */
   def genHeader(sb: StringBuilder) {
-    widgets foreach ((w: Widget) => w.module.genHeader(addrMap(w.getWName).start, sb))
+    widgets foreach ((w: Widget) => w.module.genHeader(getBaseAddr(w), sb))
   }
 
   def printWidgets {

@@ -429,6 +429,8 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
     // iterate all briges, call a method to get information related to takenhashers
   })
 
+  hashSb.append(genConstStatic("TOKENHASH_COUNT", UInt32(hashNames.length)))
+
   hashSb.append(
     genArray(
       "TOKENHASH_NAMES",

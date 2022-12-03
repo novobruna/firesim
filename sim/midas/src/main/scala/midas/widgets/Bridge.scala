@@ -31,15 +31,7 @@ abstract class BridgeModule[HostPortType <: Record with HasChannels]()(implicit 
   def module: BridgeModuleImp[HostPortType]
 }
 
-class EnableTokenHashersDefault extends Config((site, here, up) => {
-  case InsertTokenHashersKey => true
-  case TokenHashersUseCounter => false
-})
 
-class EnableTokenHashersCounter extends Config((site, here, up) => {
-  case InsertTokenHashersKey => true
-  case TokenHashersUseCounter => true
-})
 case object InsertTokenHashersKey extends Field[Boolean](false)
 case object TokenHashersUseCounter extends Field[Boolean](false)
 case object TokenHashersDepth extends Field[Int](1024)
@@ -103,7 +95,11 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
     // ------------------------------------------------------
     if(p(InsertTokenHashersKey)) {
+      println("INSERT TOKEN HASHERS")
       tokenHashers2()
+    } else {
+      println("NOOOOOOOOOT INSERT TOKEN HASHERS")
+
     }
 
     

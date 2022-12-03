@@ -229,6 +229,16 @@ class PlusArgsGroup29Bit extends TutorialSuite("PlusArgsModule", "PlusArgsModule
   }
 }
 
+class TokenHashersTest extends TutorialSuite("TokenHashersModule", "EnableTokenHashersDefault") with PlusArgsKey {
+  // it should "provide the correct default value, 1 slice" in {
+  //   assert(run("verilator", false, args = Seq(getKey(1,0))) == 0)
+  // }
+
+  it should "hash basic" in {
+    assert(run("verilator", true, args = Seq(s"+plusar_v=${BigInt("1eadbeef", 16)}", getKey(0,0))) == 0)
+  }
+}
+
 
 
 class ShiftRegisterF1Test extends TutorialSuite("ShiftRegister")
@@ -439,6 +449,7 @@ class ChiselExampleDesigns extends Suites(
   new ParityF1Test,
   new PlusArgsGroup68Bit,
   new PlusArgsGroup29Bit,
+  new TokenHashersTest,
   new ResetShiftRegisterF1Test,
   new EnableShiftRegisterF1Test,
   new StackF1Test,

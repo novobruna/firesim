@@ -10,7 +10,8 @@
  * @param [in] p A pointer to the parent instance of simif_t
  */
 simif_token_hashers_t::simif_token_hashers_t(simif_t *p) : parent(p) {
-  std::cout << "in simif_token_hashers_t()\n";
+
+#ifdef TOKENHASHMASTER_0_PRESENT
   TOKENHASHMASTER_0_substruct_create;
   trigger0 = TOKENHASHMASTER_0_substruct->triggerDelay0_TokenHashMaster;
   trigger1 = TOKENHASHMASTER_0_substruct->triggerDelay1_TokenHashMaster;
@@ -27,6 +28,7 @@ simif_token_hashers_t::simif_token_hashers_t(simif_t *p) : parent(p) {
                            TOKENHASH_QUEUEOCCUPANCIES + count);
   tokencounts0.assign(TOKENHASH_TOKENCOUNTS0, TOKENHASH_TOKENCOUNTS0 + count);
   tokencounts1.assign(TOKENHASH_TOKENCOUNTS1, TOKENHASH_TOKENCOUNTS1 + count);
+#endif
 }
 
 /**
@@ -59,6 +61,10 @@ void simif_token_hashers_t::info() {
  */
 void simif_token_hashers_t::set_params(const uint64_t delay,
                                        const uint64_t period) {
+#ifndef TOKENHASHMASTER_0_PRESENT
+  std::cout << "simif_token_hashers_t::set_params() was called but Token Hashers are not enabled in this build\n";
+  return;
+#endif  
   parent->write(trigger0, (delay & 0xffffffff));
   parent->write(trigger1, ((delay >> 32) & 0xffffffff));
 

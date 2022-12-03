@@ -131,27 +131,14 @@ public:
 
 
 
-
     target_reset();
 
 
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < 16; i++) {
       // validate before first tick and for a few after (b/c of the loop)
       validate();
 
       step(1);
-
-
-      if( false ) {
-        std::cout << "i = " << i << "\n";
-
-        uint32_t occupancy = read(pa->queueOccupancy_outChannel);
-        std::cout << "  readQueueOccupancy_outChannel   " << occupancy << std::endl;
-
-        for(uint32_t i = 0; i < occupancy; i++) {
-          std::cout << "  queueHead_outChannel   " << read(pa->queueHead_outChannel) << std::endl;
-        }
-      }
       
     }
 

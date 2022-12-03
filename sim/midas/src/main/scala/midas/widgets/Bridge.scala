@@ -5,7 +5,7 @@ package widgets
 
 import midas.core.{TargetChannelIO}
 
-import freechips.rocketchip.config.{Parameters, Field}
+import freechips.rocketchip.config.{Parameters, Field, Config}
 
 import chisel3._
 import chisel3.util._
@@ -30,6 +30,20 @@ case object TargetClockInfo extends Field[Option[RationalClock]]
 abstract class BridgeModule[HostPortType <: Record with HasChannels]()(implicit p: Parameters) extends Widget()(p) {
   def module: BridgeModuleImp[HostPortType]
 }
+
+class EnableTokenHashersDefault extends Config((site, here, up) => {
+  case InsertTokenHashersKey => true
+  case TokenHashersUseCounter => false
+})
+
+class EnableTokenHashersCounter extends Config((site, here, up) => {
+  case InsertTokenHashersKey => true
+  case TokenHashersUseCounter => true
+})
+case object InsertTokenHashersKey extends Field[Boolean](false)
+case object TokenHashersUseCounter extends Field[Boolean](false)
+case object TokenHashersDepth extends Field[Int](1024)
+
 
 class TokenHasherControlBundle extends Bundle {
   val triggerDelay = Input(UInt(64.W))
@@ -81,64 +95,34 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
     // mmio address
     //   dequeue (128 deep)
     //   head
-
-    // bramqueue (naturally 36k bits) (means queue should be 1024)
-
-    // add another IO to bridge modile imp "hasher config io", drive from fpga top
-    //   delay period
-    //   frequency
-
-    // widget called simulation master, "config io" in there, and then connect to all other bridges
     
-    
-    // add ("hasher config io")registers to:
-    // /home/centos/firesim/sim/midas/src/main/scala/midas/widgets/Master.scala
-
-    // option:
-    // delay and frequency per clock domain
-    //   emitClockDomainInfo
-
-    // add a new field / case class to parameters
-    // (name of field should end in "key")
-    // type of the key is Field[Option[TokenHasherParams]]
-    //   inside should be fifo depths
-    //   counter widths?
-    //   hash vs counter operation
-
     // one test with at least multiple bridges
     // test both directions
 
     // a peek poke bridge in loopback will test token hashers in both directions
 
-
     // ------------------------------------------------------
-    tokenHashers2(name)
+    if(p(InsertTokenHashersKey)) {
+      tokenHashers2()
+    }
 
     
     super.genCRFile()
   }
 
-  def tokenHashers2(bridgeName: String) = {
+  def tokenHashers2() = {
 
-
-    println(s"Entering tokenHashers2(${bridgeName})")
-
-
-    tokenHashersDirection(bridgeName, hPort.getOutputChannelPorts(), true)
-    tokenHashersDirection(bridgeName, hPort.getInputChannelPorts(), false)
+    tokenHashersDirection(hPort.getOutputChannelPorts(), true)
+    tokenHashersDirection(hPort.getInputChannelPorts(), false)
 
     Unit  
   }
 
-  def tokenHashersDirection(bridgeName: String, list: Seq[(String,DecoupledIO[Data])], output: Boolean) = {
+  def tokenHashersDirection(list: Seq[(String,DecoupledIO[Data])], output: Boolean) = {
 
-    list.map({ case (name,ch) =>
+    val bridgeName = name;
+    list.map({ case (signalName,ch) =>
       
-
-      val USE_COUNTER_FOR_HASH: Boolean = true
-
-      println(s"OUTPUT Channel ${name}")
-
       // how many tokens have we seen
       val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value
       
@@ -161,7 +145,6 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
       val periodMatch = periodCount === triggerFrequency(30, 0)
 
-      // lazy val periodCountReset: Bool = (delayMatch | periodMatch)
       when(delayMatch | periodMatch) {
         periodCountReset := true.B & ch.fire
       }.otherwise{
@@ -181,78 +164,39 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
       val chFire = ch.fire
       
-      
-      // val shouldHash = ch.fire
       val shouldHash = periodOK & triggerStart
-      // val shouldHash = RegNext(shouldHashUndelay)
       
+      val hash = XORHash32(ch.bits, ch.fire)
 
-      val ZZZoutputChannelHash = XORHash32(ch.bits, ch.fire)
-      // val ZZZoutputChannelHash = XORHash32(ch.bits, ch.valid)
-      // chisel3.assert(ZZZoutputChannelHash===RegNext(ZZZoutputChannelHash))
+      // counter instead of hash to debug 
+      val counterAsHash = WideCounter(width = 32, inhibit = !ch.fire).value
 
-      // val readHash = genROReg(ZZZoutputChannelHash, s"readHash${name}")
+      val useHash = if(p(TokenHashersUseCounter)) counterAsHash else hash
 
-
-
-      // fake hash to debug 
-      val fakeHash = WideCounter(width = 32, inhibit = !ch.fire).value
-
-      val useHash = if(USE_COUNTER_FOR_HASH) fakeHash else ZZZoutputChannelHash
-
-
-      // val fifoDepth = 1024
-      val fifoDepth = 128
+      val fifoDepth = p(TokenHashersDepth)
 
       // 36K bits (32K usable bits)
       val q = Module(new BRAMQueue(fifoDepth)(UInt(32.W)))
       q.io.enq.valid := shouldHash
       q.io.enq.bits := useHash
 
-      val queueHead = attachDecoupledSource(q.io.deq, s"queueHead_${name}")
+      val queueHead = attachDecoupledSource(q.io.deq, s"queueHead_${signalName}")
 
-      val occupanyName = s"queueOccupancy_${name}"
-      val counter0Name = s"tokenCount0_${name}"
-      val counter1Name = s"tokenCount1_${name}"
+      val occupanyName = s"queueOccupancy_${signalName}"
+      val counter0Name = s"tokenCount0_${signalName}"
+      val counter1Name = s"tokenCount1_${signalName}"
 
       val occupancyReg = genROReg(q.io.count, occupanyName)
       val counterLow   = genROReg(tokenCount(31,0), counter0Name)
       val counterHigh  = genROReg(tokenCount(63,32), counter1Name)
       
-      val meta = TokenHasherMeta(bridgeName, name, output, queueHead, getCRAddr(occupanyName), getCRAddr(counter0Name), getCRAddr(counter1Name))
+      val meta = TokenHasherMeta(bridgeName, signalName, output, queueHead, getCRAddr(occupanyName), getCRAddr(counter0Name), getCRAddr(counter1Name))
 
       hashRecord += meta
-
-      dontTouch(ZZZoutputChannelHash)
-      dontTouch(triggerDelay)
-      dontTouch(triggerFrequency)
-      dontTouch(delayMatch)
-      dontTouch(triggerStart)
-      dontTouch(periodCountReset)
-      dontTouch(periodMatch)
-      dontTouch(chFire)
-      dontTouch(shouldHash)
-      dontTouch(fakeHash)
-      dontTouch(periodOK)
-
-      // q.io.deq.valid 
-      // when(counter > 3.U) {
-      //   q.io.deq.valid = true.B
-      // }
-
     })
 
     Unit
   }
-
-  // tokenHashers2()
-  // hPort.tokenHashers()
-  // lazy val setupTokenHashers = hPort.tokenHashers()
-  // println("BridgeModuleImp")
-  // println(hPort)
-  // hPort.tokenHashers()
-
-
 }
 
 trait Bridge[HPType <: Record with HasChannels, WidgetType <: BridgeModule[HPType]] {
@@ -292,10 +236,6 @@ trait HasChannels {
 
   def getOutputChannelPorts(): Seq[(String,DecoupledIO[Data])]
   def getInputChannelPorts(): Seq[(String,DecoupledIO[Data])]
-
-  // copy bridgeChannels
-  // def tokenHashers(): Unit=Nil
-  // def tokenHashers(): {}
 
   // Called in FPGATop to connect the instantiated bridge to channel ports on the wrapper
   private[midas] def connectChannels2Port(bridgeAnno: BridgeIOAnnotation, channels: TargetChannelIO): Unit

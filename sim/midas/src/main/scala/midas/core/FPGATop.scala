@@ -131,7 +131,12 @@ class FPGATop(implicit p: Parameters) extends LazyModule with HasWidgets {
     "Simulation control bus must be 32-bits wide per AXI4-lite specification")
   val master = addWidget(new SimulationMaster)
 
-  val hashMaster = addWidget(new TokenHashMaster)
+  val hashMaster: Option[TokenHashMaster] = if(p(InsertTokenHashersKey)) {
+    Some(addWidget(new TokenHashMaster))
+  } else {
+    None
+  }
+  // val hashMaster: Option[TokenHashMaster] = None
 
   val bridgeAnnos = p(SimWrapperKey).annotations collect { case ba: BridgeIOAnnotation => ba }
   val bridgeModuleMap: ListMap[BridgeIOAnnotation, BridgeModule[_ <: Record with HasChannels]] = 
@@ -335,6 +340,62 @@ class FPGATop(implicit p: Parameters) extends LazyModule with HasWidgets {
 }
 
 class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(outer) {
+
+  def insertTokenHashers(hashSb: StringBuilder): Unit = {
+    hashSb.append(genConstStatic("TOKENHASH_COUNT", UInt32(hashName.length)))
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_BRIDGENAMES",
+        hashBridgeName.map(CStrLit(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_NAMES",
+        hashName.map(CStrLit(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_OUTPUTS",
+        hashOutput.map(UInt32(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_QUEUEHEADS",
+        hashQueueHead.map(UInt32(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_QUEUEOCCUPANCIES",
+        hashQueueOccupancy.map(UInt32(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_TOKENCOUNTS0",
+        hashtokenCount0.map(UInt32(_))
+      )
+    )
+
+    hashSb.append(
+      genArray(
+        "TOKENHASH_TOKENCOUNTS1",
+        hashtokenCount1.map(UInt32(_))
+      )
+    )
+
+    Unit
+  }
+
   // Mark the host clock so that ILA wiring and user-registered host
   // transformations can inject hardware synchronous to correct clock.
   HostClockSource.annotate(clock)
@@ -381,8 +442,6 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
   val hashQueueOccupancy = mutable.ArrayBuffer[Int]()
   val hashtokenCount0    = mutable.ArrayBuffer[Int]()
   val hashtokenCount1    = mutable.ArrayBuffer[Int]()
-  // hashSb.append("hi")
-  // hashSb.append("hello")
 
   // Instantiate bridge widgets.
   outer.bridgeModuleMap.map({ case (bridgeAnno, bridgeMod) =>
@@ -412,75 +471,23 @@ class FPGATopImp(outer: FPGATop)(implicit p: Parameters) extends LazyModuleImp(o
       hashQueueOccupancy += mOffset.queueOccupancy.toInt
       hashtokenCount0 += mOffset.tokenCount0.toInt
       hashtokenCount1 += mOffset.tokenCount1.toInt
-      println(hashSb)
-      println(f"FoundDDD")
-      println(meta)
     }
 
-    // Connect "hasher config io" from master to all bridges
-    bridgeMod.module.tokenHasherControlIO.triggerDelay := hashMaster.module.io.triggerDelay
-    bridgeMod.module.tokenHasherControlIO.triggerPeriod := hashMaster.module.io.triggerPeriod
+    hashMaster match {
+      case Some(hm) => {
+        // Connect "hasher config io" from master to all bridges
+        bridgeMod.module.tokenHasherControlIO.triggerDelay := hm.module.io.triggerDelay
+        bridgeMod.module.tokenHasherControlIO.triggerPeriod := hm.module.io.triggerPeriod
+      }
+      case None => {}
+    }
 
-    println("BASE")
-    println(outer.getBaseAddr(bridgeMod))
-
-    // outer.addrMap
-    // println(addrMap(name).start)
-    
-    // bridgeMod.module.hPort.tokenHashers()
-    // iterate all briges, call a method to get information related to takenhashers
   })
 
-  hashSb.append(genConstStatic("TOKENHASH_COUNT", UInt32(hashName.length)))
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_BRIDGENAMES",
-      hashBridgeName.map(CStrLit(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_NAMES",
-      hashName.map(CStrLit(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_OUTPUTS",
-      hashOutput.map(UInt32(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_QUEUEHEADS",
-      hashQueueHead.map(UInt32(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_QUEUEOCCUPANCIES",
-      hashQueueOccupancy.map(UInt32(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_TOKENCOUNTS0",
-      hashtokenCount0.map(UInt32(_))
-    )
-  )
-
-  hashSb.append(
-    genArray(
-      "TOKENHASH_TOKENCOUNTS1",
-      hashtokenCount1.map(UInt32(_))
-    )
-  )
+  hashMaster match {
+    case Some(hm) => insertTokenHashers(hashSb)
+    case None => {}
+  }
 
   outer.printStreamSummary(outer.toCPUStreamParams,   "Bridge Streams To CPU:")
   outer.printStreamSummary(outer.fromCPUStreamParams, "Bridge Streams From CPU:")

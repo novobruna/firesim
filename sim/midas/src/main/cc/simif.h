@@ -5,12 +5,16 @@
 
 #include <cassert>
 #include <cstring>
-#include <gmp.h>
-#include <map>
+
+#include <memory>
 #include <queue>
 #include <random>
 #include <sstream>
+
+#include <gmp.h>
+#include <map>
 #include <sys/time.h>
+
 #define TIME_DIV_CONST 1000000.0;
 typedef uint64_t midas_time_t;
 
@@ -20,6 +24,41 @@ double diff_secs(midas_time_t end, midas_time_t start);
 
 typedef std::map<std::string, size_t> idmap_t;
 typedef std::map<std::string, size_t>::const_iterator idmap_it_t;
+
+/**
+ * Interface for a simulation implementation.
+ *
+ * `simif_t` interacts with the simulation, initialising it, running and and
+ * running finalisation logic at the end.  All simulation implementations
+ * (midasexamples, firesim, bridges, fasedtests) derive this interface,
+ * implementing the driver-specific logic.
+ */
+class simulation_t {
+public:
+  simulation_t(const std::vector<std::string> &args) : args(args) {}
+
+  virtual ~simulation_t() {}
+
+  /**
+   * Simulation main loop.
+   *
+   * @return Exit code to return to the system.
+   */
+  virtual int simulation_run() = 0;
+
+  /**
+   * Simulation initialization. Should set up bridges.
+   */
+  virtual void simulation_init() {}
+
+  /**
+   * Simulation finalization. Should tear down bridges.
+   */
+  virtual void simulation_finish() {}
+
+protected:
+  const std::vector<std::string> args;
+};
 
 /** \class simif_t
  *
@@ -49,12 +88,21 @@ typedef std::map<std::string, size_t>::const_iterator idmap_it_t;
  */
 class simif_t {
 public:
-  simif_t();
+  simif_t(const std::vector<std::string> &args);
   virtual ~simif_t() {}
+
+protected:
+  /// Reference to the user-defined bits of the simulation.
+  std::unique_ptr<simulation_t> sim;
+
+  std::string loadmem;
+  bool fastloadmem = false;
+  // If set, will write all zeros to fpga dram before commencing simulation
+  bool do_zero_out_dram = false;
 
 private:
   // random numbers
-  uint64_t seed;
+  uint64_t seed = 0;
   std::mt19937_64 gen;
   const SIMULATIONMASTER_struct master_mmio_addrs;
   const LOADMEMWIDGET_struct loadmem_mmio_addrs;
@@ -68,7 +116,15 @@ private:
 
 public:
   // Simulation APIs
-  virtual void init(int argc, char **argv);
+  void target_init();
+
+  /**
+   * Simulation main loop.
+   */
+  int run();
+
+  virtual void sim_init() = 0;
+
   inline bool done() { return read(master_mmio_addrs.DONE); }
   inline void take_steps(size_t n, bool blocking) {
     write(master_mmio_addrs.STEP, n);
@@ -85,12 +141,12 @@ public:
    * cannot be done in the constructor. (For one, currently command line args
    * are not passed to constructor).
    */
-  virtual void host_init(int argc, char **argv) = 0;
+  virtual void host_init() = 0;
 
   /**
    *  Does final platform-specific cleanup before destructors are called.
    */
-  virtual int host_finish() = 0;
+  virtual void host_finish() = 0;
 
   /** Bridge / Widget MMIO methods */
 

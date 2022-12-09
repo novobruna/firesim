@@ -4,28 +4,34 @@
 #include "simif_f1.h"
 #define SIMIF simif_f1_t
 #else
-#include "simif_emul.h"
-#define SIMIF simif_emul_t
+#ifdef VCS
+#include "simif_emul_vcs.h"
+#define SIMIF simif_emul_vcs_t
+#else
+#include "simif_emul_verilator.h"
+#define SIMIF simif_emul_verilator_t
+#endif
 #endif
 
 #include "bridges/uart.h"
 #include "simif_peek_poke.h"
 
-class UARTModuleTest final : public simif_peek_poke_t {
-public:
+class UARTModuleTest final : public simif_peek_poke_t, public simulation_t {
+private:
   class Handler final : public uart_handler {
   public:
     Handler(UARTModuleTest &test) { test.handler = this; }
 
-    ~Handler() {
+    int check() {
       // Check that the input and output buffers are equal.
       if (in_buffer != out_buffer) {
         fprintf(stderr,
                 "Buffer mismatch:\n  %s\n  %s\n",
                 in_buffer.c_str(),
                 out_buffer.c_str());
-        abort();
+        return EXIT_FAILURE;
       }
+      return EXIT_SUCCESS;
     }
 
     std::optional<char> get() override {
@@ -41,18 +47,17 @@ public:
     size_t in_index = 0;
   };
 
-  Handler *handler;
-
-  UARTModuleTest(simif_t &simif)
+public:
+  UARTModuleTest(simif_t &simif, const std::vector<std::string> &args)
       : simif_peek_poke_t(&simif, PEEKPOKEBRIDGEMODULE_0_substruct_create),
+        simulation_t(args),
         uart(std::make_unique<uart_t>(&simif,
                                       UARTBRIDGEMODULE_0_substruct_create,
                                       std::make_unique<Handler>(*this))) {}
 
-  void run() {
-    // Initialise the UART bridge.
-    uart->init();
+  void simulation_init() override { uart->init(); }
 
+  int simulation_run() override {
     // Reset the device.
     poke(reset, 1);
     step(1);
@@ -64,21 +69,19 @@ public:
     for (unsigned i = 0; i < 100000 && !simif->done(); ++i) {
       uart->tick();
     }
-
-    // Cleanup.
-    uart->finish();
+    return handler->check();
   }
 
+  void simulation_finish() override { uart->finish(); }
+
 private:
+  Handler *handler;
   std::unique_ptr<uart_t> uart;
 };
 
 int main(int argc, char **argv) {
   std::vector<std::string> args(argv + 1, argv + argc);
   SIMIF simif(args);
-  simif.init(argc, argv);
-
-  UARTModuleTest test(simif);
-  test.run();
-  return test.teardown();
+  UARTModuleTest test(simif, args);
+  return simif.run(argc, argv, test);
 }

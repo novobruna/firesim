@@ -13,18 +13,20 @@ public:
   virtual ~simif_vitis_t(){};
   // Unused by Vitis since initialization / deinitization is done in the
   // constructor
-  virtual void host_init(int argc, char **argv) override{};
-  virtual int host_finish() override { return 0; };
-  virtual void write(size_t addr, uint32_t data) override;
-  virtual uint32_t read(size_t addr) override;
-  virtual size_t pull(unsigned stream_idx,
-                      void *dest,
-                      size_t num_bytes,
-                      size_t threshold_bytes) override;
-  virtual size_t push(unsigned stream_idx,
-                      void *src,
-                      size_t num_bytes,
-                      size_t threshold_bytes) override;
+  void sim_init() override {}
+  void host_init() override {}
+  void host_finish() override {}
+
+  void write(size_t addr, uint32_t data) override;
+  uint32_t read(size_t addr) override;
+  size_t pull(unsigned stream_idx,
+              void *dest,
+              size_t num_bytes,
+              size_t threshold_bytes) override;
+  size_t push(unsigned stream_idx,
+              void *src,
+              size_t num_bytes,
+              size_t threshold_bytes) override;
   uint32_t is_write_ready();
 
 private:

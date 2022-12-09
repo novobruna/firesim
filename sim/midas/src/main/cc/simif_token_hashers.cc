@@ -19,15 +19,15 @@ simif_token_hashers_t::simif_token_hashers_t(simif_t *p) : parent(p) {
   period1 = TOKENHASHMASTER_0_substruct->triggerPeriod1_TokenHashMaster;
   free(TOKENHASHMASTER_0_substruct);
 
-  count = TOKENHASH_COUNT;
-  bridge_names.assign(TOKENHASH_BRIDGENAMES, TOKENHASH_BRIDGENAMES + count);
-  names.assign(TOKENHASH_NAMES, TOKENHASH_NAMES + count);
-  outputs.assign(TOKENHASH_OUTPUTS, TOKENHASH_OUTPUTS + count);
-  queue_heads.assign(TOKENHASH_QUEUEHEADS, TOKENHASH_QUEUEHEADS + count);
+  cnt = TOKENHASH_COUNT;
+  bridge_names.assign(TOKENHASH_BRIDGENAMES, TOKENHASH_BRIDGENAMES + cnt);
+  names.assign(TOKENHASH_NAMES, TOKENHASH_NAMES + cnt);
+  outputs.assign(TOKENHASH_OUTPUTS, TOKENHASH_OUTPUTS + cnt);
+  queue_heads.assign(TOKENHASH_QUEUEHEADS, TOKENHASH_QUEUEHEADS + cnt);
   queue_occupancies.assign(TOKENHASH_QUEUEOCCUPANCIES,
-                           TOKENHASH_QUEUEOCCUPANCIES + count);
-  tokencounts0.assign(TOKENHASH_TOKENCOUNTS0, TOKENHASH_TOKENCOUNTS0 + count);
-  tokencounts1.assign(TOKENHASH_TOKENCOUNTS1, TOKENHASH_TOKENCOUNTS1 + count);
+                           TOKENHASH_QUEUEOCCUPANCIES + cnt);
+  tokencounts0.assign(TOKENHASH_TOKENCOUNTS0, TOKENHASH_TOKENCOUNTS0 + cnt);
+  tokencounts1.assign(TOKENHASH_TOKENCOUNTS1, TOKENHASH_TOKENCOUNTS1 + cnt);
 #endif
 }
 
@@ -40,7 +40,7 @@ void simif_token_hashers_t::info() {
   std::cout << "period0 " << period0 << "\n";
   std::cout << "period1 " << period1 << "\n";
 
-  for (uint32_t i = 0; i < count; i++) {
+  for (uint32_t i = 0; i < cnt; i++) {
     std::cout << "i: " << i << "\n";
     std::cout << "  bridge: " << bridge_names[i] << "\n";
     std::cout << "  name: " << names[i] << "\n";
@@ -81,7 +81,7 @@ void simif_token_hashers_t::set_params(const uint64_t delay,
  */
 token_hasher_result_t simif_token_hashers_t::get() {
   token_hasher_result_t ret;
-  for (uint32_t i = 0; i < count; i++) {
+  for (uint32_t i = 0; i < cnt; i++) {
     ret.push_back({});
     const uint32_t occ = occupancy(i);
     std::vector<uint32_t> &data = ret[i];
@@ -126,9 +126,9 @@ void simif_token_hashers_t::print() { std::cout << get_string(); }
  * @retval The occupancy of the FIFO holding hashes
  */
 uint32_t simif_token_hashers_t::occupancy(const size_t index) {
-  if (index >= count) {
+  if (index >= cnt) {
     std::cerr << "index: " << index
-              << " passed to occupany() is larger than count: " << count
+              << " passed to occupany() is larger than count: " << cnt
               << "\n";
     exit(1);
   }
@@ -142,9 +142,9 @@ uint32_t simif_token_hashers_t::occupancy(const size_t index) {
  * @retval The number of tokens a bridge has seen
  */
 uint64_t simif_token_hashers_t::tokens(const size_t index) {
-  if (index >= count) {
+  if (index >= cnt) {
     std::cerr << "index: " << index
-              << " passed to tokens() is larger than count: " << count << "\n";
+              << " passed to tokens() is larger than count: " << cnt << "\n";
     exit(1);
   }
   uint64_t r0 = parent->read(tokencounts0[index]);
@@ -153,4 +153,24 @@ uint64_t simif_token_hashers_t::tokens(const size_t index) {
   uint64_t val = (r1 << 32) | r0;
 
   return val;
+}
+
+/**
+ * Get the name of the bridge at by index. This number is not affected by delay/period
+ * @param [in] index The index of the bridge
+ * @retval The number of tokens a bridge has seen
+ */
+std::tuple<std::string, std::string> simif_token_hashers_t::name(const size_t index) {
+  if (index >= cnt) {
+    std::cerr << "index: " << index
+              << " passed to name() is larger than count: " << cnt << "\n";
+    exit(1);
+  }
+
+  return {bridge_names[index], names[index]};
+}
+
+
+size_t simif_token_hashers_t::count() {
+  return cnt;
 }

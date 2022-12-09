@@ -9,9 +9,10 @@
 #include <string_view>
 
 /**
- * @brief PlusArgs Bridge Driver Test
+ * @brief Token Hashers Bridge Driver Test
  *
- * This test parses `+plusargs_test_key` (given by TutorialSuite.scala)
+ * This test copies the cramework from PlusArgsModule.h
+ * parses `+plusargs_test_key` (given by TutorialSuite.scala)
  * and asserts for the correct values
  */
 class TokenHashersModule_t : public simif_peek_poke_t {
@@ -110,6 +111,30 @@ public:
   }
 
   /**
+   * Call initial set_params.
+   * @return the number of loops the main for loop should execute
+   */
+  int choose_params() {
+    int loops = 16;
+    if (!found_key) {
+      return loops; // bail if no key was passed. run no assertions
+    }
+    switch (test_key) {
+    case 0x00:
+      token_hashers->set_params(0, 0);
+      loops = 32;
+      break;
+    default:
+    case -1:
+      std::cerr << "unknown test_key " << test_key << "\n";
+      exit(1);
+      break;
+    }
+
+    return loops;
+  }
+
+  /**
    * Run. Check our assertions before the first step, as well as 7 more times.
    * These extra assertion make sure that the value does not change or glitch.
    */
@@ -119,32 +144,24 @@ public:
       std::cout << "No test key found, will not assert\n";
     }
 
+    // token_hashers->set_params(0,0);
+    const int loops = choose_params();
 
-    token_hashers->set_params(0,0);
-
-
-    PLUSARGSBRIDGEMODULE_0_substruct_create;
-    auto pa = PLUSARGSBRIDGEMODULE_0_substruct;
-
+    // for(int i = 0; i < )
 
     plusargsinator->init();
 
-
-
     target_reset();
 
-
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < loops; i++) {
       // validate before first tick and for a few after (b/c of the loop)
-      validate();
+      // validate();
 
       step(1);
-      
     }
 
     // token_hashers->get();
     token_hashers->print();
-
   }
 
 private:

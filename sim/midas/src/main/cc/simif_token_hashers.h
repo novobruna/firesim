@@ -29,13 +29,16 @@ public:
   void print();
   uint32_t occupancy(const size_t index);
   uint64_t tokens(const size_t index);
+  std::tuple<std::string, std::string> name(const size_t index);
+  size_t count();
+  
 
   uint32_t trigger0;
   uint32_t trigger1;
   uint32_t period0;
   uint32_t period1;
 
-  size_t count;
+  size_t cnt;
   std::vector<std::string> bridge_names;
   std::vector<std::string> names;
   std::vector<bool> outputs;

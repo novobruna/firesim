@@ -229,7 +229,9 @@ class PlusArgsGroup29Bit extends TutorialSuite("PlusArgsModule", "PlusArgsModule
   }
 }
 
-class TokenHashersTest extends TutorialSuite("TokenHashersModule", "EnableTokenHashersDefault") with PlusArgsKey {
+// This test piggy-backs off of PlusArgsTest. Because the token hashers apply to all bridges
+// it makes sense to use an existing one
+class TokenHashersTest extends TutorialSuite("TokenHashersModule", "PlusArgsModuleTestConfigGroup29Bit", "HostDebugFeatures_DefaultF1Config_EnableTokenHashersDefault") with PlusArgsKey {
   // it should "provide the correct default value, 1 slice" in {
   //   assert(run("verilator", false, args = Seq(getKey(1,0))) == 0)
   // }

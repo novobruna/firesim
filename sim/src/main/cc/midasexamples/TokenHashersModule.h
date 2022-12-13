@@ -161,7 +161,10 @@ public:
     }
 
     // token_hashers->get();
-    token_hashers->print();
+    // token_hashers->print();
+    std::cout << token_hashers->get_csv_string();
+
+    // token_hashers->write_csv_file("test-run.csv");
   }
 
 private:

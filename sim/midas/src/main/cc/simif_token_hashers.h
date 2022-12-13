@@ -25,12 +25,16 @@ public:
   void info();
   void set_params(const uint64_t delay, const uint64_t period);
   token_hasher_result_t get();
+  token_hasher_result_t cached_get();
   std::string get_string();
+  std::string get_csv_string();
+  void write_csv_file(const std::string path);
   void print();
   uint32_t occupancy(const size_t index);
   uint64_t tokens(const size_t index);
   std::tuple<std::string, std::string> name(const size_t index);
   size_t count();
+  token_hasher_result_t cached_results;
   
 
   uint32_t trigger0;

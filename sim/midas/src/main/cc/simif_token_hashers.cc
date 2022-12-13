@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 /**
  * The constructor for simif_token_hashers_t.
@@ -76,7 +77,9 @@ void simif_token_hashers_t::set_params(const uint64_t delay,
  * Readout all token hashes from the FPGA using MMIO.
  * Returned value is a vector of vector of hashes. The index
  * to the outer vector is the number of the bridge. The bridge oder / numbering
- * is determined by scala at compiletime.
+ * is determined by scala at compiletime. Calling this twice in a row 
+ * will yield empty results the second time. This is because
+ * the FIFO's are drained and so occupancy will return 0
  * @retval a vector of vector of hashes
  */
 token_hasher_result_t simif_token_hashers_t::get() {
@@ -96,12 +99,25 @@ token_hasher_result_t simif_token_hashers_t::get() {
 }
 
 /**
- * Get a string of all the hashes. This calls get() internally
+ * Same as get() however multiple calls will alwaus return the same data
+ * Work is only done on the first call, subsequent calls return cached data
+ * from the first time.
+ */
+token_hasher_result_t simif_token_hashers_t::cached_get() {
+  if(cached_results.size() == 0) {
+    cached_results = get();
+  }
+
+  return cached_results;
+}
+
+/**
+ * Get a string of all the hashes. This calls cached_get() internally
  * @retval a std::string with human readable output
  */
 std::string simif_token_hashers_t::get_string() {
   std::ostringstream oss;
-  auto got = get();
+  auto got = cached_get();
   uint32_t i = 0;
   for (const auto &row : got) {
     oss << "Bridge " << i << ": " << bridge_names[i] << "->" << names[i]
@@ -113,6 +129,36 @@ std::string simif_token_hashers_t::get_string() {
   }
 
   return oss.str();
+}
+
+/**
+ * Get a string with a CSV of all the hashes. This calls cached_get() internally
+ * @retval a std::string with human readable output
+ */
+std::string simif_token_hashers_t::get_csv_string() {
+  std::ostringstream oss;
+  auto got = cached_get();
+  uint32_t i = 0;
+  oss << "Hash index, Name, Hash\n";
+  std::string name;
+  for (const auto &row : got) {
+    name = (std::ostringstream() << "Bridge #" << i << " " << bridge_names[i] << "->" << names[i]).str();
+    uint32_t j = 0;
+    for (const auto &data : row) {
+      oss << j << "," << name << "," << data << "\n";
+      j++;
+    }
+    i++;
+  }
+
+  return oss.str();
+}
+
+void simif_token_hashers_t::write_csv_file(const std::string path) {
+  std::ofstream file;
+  file.open (path, std::ios::out);
+  file << get_csv_string();
+  file.close();
 }
 
 /**

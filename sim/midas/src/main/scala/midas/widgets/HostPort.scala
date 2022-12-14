@@ -177,28 +177,6 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
   }
 
   def getOutputChannelPorts() = {
-    val ret = rvOuts.map({ case (field, chName) =>
-      val (fwdChName, revChName)  = SimUtils.rvChannelNamePair(chName)
-      println(s"getOutputChannelPorts OUTPUT RV ${chName} ${fwdChName} ${revChName}")
-      println("Class: " + field.getClass)
-      (chName, new DecoupledIO(Wire(field.bits)))
-    //   // val validTarget = field.valid.toNamed.toTarget
-    //   // ReadyValidBridgeChannel(
-    //   //   fwdChName,
-    //   //   revChName,
-    //   //   clock = getClock.toNamed.toTarget,
-    //   //   sinks = SimUtils.lowerAggregateIntoLeafTargets(field.bits) ++ Seq(validTarget),
-    //   //   sources = Seq(),
-    //   //   valid = validTarget,
-    //   //   ready = field.ready.toNamed.toTarget
-    //   // )
-    })
-    // Seq()
-    ret
-    Seq()
-  }
-  
-  def getInputChannelPorts() = {
 
     val flt = FlattenData(hBits)
 
@@ -207,7 +185,7 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
 
     println("--------------- partition ---------------")
 
-    val (inputFlat, outputFlat) = flt.partition(
+    val (_, outputFlat) = flt.partition(
       {
         case (field, direction) => {
           direction match {
@@ -220,15 +198,45 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
     )
 
 
-    // flt.map({ case (field, direction) =>
-    // inputFlat.map({ case (field, direction) => // input
-    // outputFlat.map({ case (field, direction) =>
-    //   println("Field type: " + field.getClass + " direction: " + direction.getClass )
-    //   direction match {
-    //   case ActualDirection.Output => println("found output")
-    //   case ActualDirection.Input => println("found Input")
-    //   }      
-    // })
+
+    val ret3 = outputFlat.map({ case (field, direction) => // input
+      // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
+      val clean = sanatizeName(""+field.toPrintable)
+      println("Field name: " + clean + " direction: " + direction )
+
+      val dec = Wire(Output(new DecoupledIO(field)))
+      dec.ready := toHost.hReady
+      dec.valid := toHost.hValid
+      dec.bits := field
+      (clean, dec)
+    })
+
+
+    ret3
+  }
+  
+  def getInputChannelPorts() = {
+
+    val flt = FlattenData(hBits)
+
+    // fromHost is output
+    // toHost is input
+
+    println("--------------- partition ---------------")
+
+    val (inputFlat, _) = flt.partition(
+      {
+        case (field, direction) => {
+          direction match {
+            case ActualDirection.Output => false
+            case ActualDirection.Input  => true
+            case _                      => false
+          }
+        }
+      }
+    )
+
+
 
     val ret3 = inputFlat.map({ case (field, direction) => // input
       // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
@@ -236,49 +244,14 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
       println("Field name: " + clean + " direction: " + direction )
 
       val dec = Wire(Output(new DecoupledIO(field)))
-      dec.ready := true.B
-      dec.valid := true.B
+      dec.ready := toHost.hReady
+      dec.valid := toHost.hValid
       dec.bits := field
       (clean, dec)
     })
 
 
-    val ret2 = inputWireChannels.map({ case (field, chName) =>
-      println(s"getInputChannelPorts INPUT ${chName}")
-      println("Class: " + field.getClass)
-      // create own wire, add all of the payload together, drive ready/valid using
-      // tohost/ fromhost signals
-      // Wire(Output(new DecoupledIO))
-      // FlattenData, then use partition to split inputs and outputs
-      // (/home/centos/firesim/sim/midas/src/main/scala/midas/widgets/Lib.scala:19)
-
-
-      val foo = RegInit(3.U(32.W))
-      // val foo = Bool()
-      // val foo = Output(UInt((32).W))
-      // (chName, new ReadyValidIO(foo))
-      // val dec = Wire(new DecoupledIO(foo))
-      val dec = Wire(Output(new DecoupledIO(foo)))
-      dec.ready := true.B
-      dec.valid := true.B
-      // dec.bits := 4.U
-      dec.bits := field
-      // (chName, Wire(Output(dec)))
-      (chName, dec)
-      // (chName, Wire(new DecoupledIO(field)))
-      // (chName, field)
-      // (chName, new DecoupledIO(Wire(field)))
-      // PipeBridgeChannel(
-      //     chName,
-      //     clock = clockRT,
-      //     sinks = Seq(),
-      //     sources = Seq(field.toNamed.toTarget),
-      //     latency = 1
-      // )
-    })
     ret3
-    // ret2
-    // Seq()
   }
 }
 

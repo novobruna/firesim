@@ -7,7 +7,7 @@ import midas.core.SimUtils
 import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel}
 
 import chisel3._
-import chisel3.util.ReadyValidIO
+import chisel3.util.{ReadyValidIO, Decoupled, DecoupledIO}
 import chisel3.experimental.{BaseModule, Direction, ChiselAnnotation, annotate}
 
 import freechips.rocketchip.util.{DecoupledHelper}
@@ -37,6 +37,8 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
 
   override def cloneType: this.type = new HostPortIO(targetPortProto).asInstanceOf[this.type]
 
+  println("HOSTPORTIO OOOOOOOOOOOOOO")
+
   private[midas] def getClock(): Clock = {
     val allTargetClocks = SimUtils.findClocks(targetPortProto)
     require(allTargetClocks.nonEmpty,
@@ -65,6 +67,7 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
   lazy val name2ReadyValid = Map((rvIns ++ rvOuts).map({ case (wire, name) => name -> wire }):_*)
 
   def connectChannels2Port(bridgeAnno: BridgeIOAnnotation, targetIO: TargetChannelIO): Unit = {
+    println("CONNECTCHANNELS2PORT")
     val local2globalName = bridgeAnno.channelMapping.toMap
     val toHostChannels, fromHostChannels = mutable.ArrayBuffer[ReadyValidIO[Data]]()
 
@@ -168,13 +171,81 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
       )
     })
   }
-  def tokenHashers() = {
-    println("CALLED tokenHashers from HostPort")
-    Unit
-  }
 
-  def getOutputChannelPorts() = Seq()
-  def getInputChannelPorts() = Seq()
+
+  def getOutputChannelPorts() = {
+    val ret = rvOuts.map({ case (field, chName) =>
+      val (fwdChName, revChName)  = SimUtils.rvChannelNamePair(chName)
+      println(s"getOutputChannelPorts OUTPUT RV ${chName} ${fwdChName} ${revChName}")
+      println("Class: " + field.getClass)
+      (chName, new DecoupledIO(Wire(field.bits)))
+    //   // val validTarget = field.valid.toNamed.toTarget
+    //   // ReadyValidBridgeChannel(
+    //   //   fwdChName,
+    //   //   revChName,
+    //   //   clock = getClock.toNamed.toTarget,
+    //   //   sinks = SimUtils.lowerAggregateIntoLeafTargets(field.bits) ++ Seq(validTarget),
+    //   //   sources = Seq(),
+    //   //   valid = validTarget,
+    //   //   ready = field.ready.toNamed.toTarget
+    //   // )
+    })
+    // Seq()
+    ret
+    Seq()
+  }
+  
+  def getInputChannelPorts() = {
+    val ret = rvIns.map({ case (field, chName) =>
+      val (fwdChName, revChName)  = SimUtils.rvChannelNamePair(chName)
+      println(s"getInputChannelPorts INPUT RV ${chName} ${fwdChName} ${revChName}")
+      // val validTarget = field.valid.toNamed.toTarget
+      // ReadyValidBridgeChannel(
+      //   fwdChName,
+      //   revChName,
+      //   clock = getClock.toNamed.toTarget,
+      //   sinks = Seq(),
+      //   sources = SimUtils.lowerAggregateIntoLeafTargets(field.bits) ++ Seq(validTarget),
+      //   valid = validTarget,
+      //   ready = field.ready.toNamed.toTarget
+      // )
+    })
+    // ret
+
+    val ret2 = inputWireChannels.map({ case (field, chName) =>
+      println(s"getInputChannelPorts INPUT ${chName}")
+      println("Class: " + field.getClass)
+      // create own wire, add all of the payload together, drive ready/valid using
+      // tohost/ fromhost signals
+      // Wire(Output(new DecoupledIO))
+      // FlattenData, then use partition to split inputs and outputs
+
+
+      val foo = RegInit(3.U(32.W))
+      // val foo = Bool()
+      // val foo = Output(UInt((32).W))
+      // (chName, new ReadyValidIO(foo))
+      // val dec = Wire(new DecoupledIO(foo))
+      val dec = Wire(Output(new DecoupledIO(foo)))
+      dec.ready := true.B
+      dec.valid := true.B
+      dec.bits := 4.U
+      // (chName, Wire(Output(dec)))
+      (chName, dec)
+      // (chName, Wire(new DecoupledIO(field)))
+      // (chName, field)
+      // (chName, new DecoupledIO(Wire(field)))
+      // PipeBridgeChannel(
+      //     chName,
+      //     clock = clockRT,
+      //     sinks = Seq(),
+      //     sources = Seq(field.toNamed.toTarget),
+      //     latency = 1
+      // )
+    })
+    ret2
+    // Seq()
+  }
 }
 
 object HostPort {

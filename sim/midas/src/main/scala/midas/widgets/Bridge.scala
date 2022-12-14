@@ -118,6 +118,8 @@ abstract class BridgeModuleImp[HostPortType <: Record with HasChannels]
 
     val bridgeName = name;
     list.map({ case (signalName,ch) =>
+
+      println(s"DIRECTION ${signalName}")
       
       // how many tokens have we seen
       val tokenCount = WideCounter(width = 64, inhibit = !ch.fire).value

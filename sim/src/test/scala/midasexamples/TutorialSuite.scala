@@ -257,7 +257,7 @@ class AutoCounterModuleF1Test extends TutorialSuite("AutoCounterModule",
   checkAutoCounterCSV("autocounter0.csv", "AUTOCOUNTER_PRINT ")
 }
 class AutoCounter32bRolloverTest extends TutorialSuite("AutoCounter32bRollover",
-    simulationArgs = Seq("+autocounter-readrate=1000", "+autocounter-filename-base=autocounter")) {
+    simulationArgs = Seq("+autocounter-readrate=1000", "+autocounter-filename-base=autocounter", "HostDebugFeatures_DefaultF1Config_EnableTokenHashersDefault")) {
   checkAutoCounterCSV("autocounter0.csv", "AUTOCOUNTER_PRINT ")
 }
 class AutoCounterCoverModuleF1Test extends TutorialSuite("AutoCounterCoverModule",
@@ -297,7 +297,9 @@ class PrintfModuleF1Test extends TutorialSuite("PrintfModule",
   diffSynthesizedLog("synthprinttest.out0")
 }
 class NarrowPrintfModuleF1Test extends TutorialSuite("NarrowPrintfModule",
-  simulationArgs = Seq("+print-no-cycle-prefix", "+print-file=synthprinttest.out")) {
+  simulationArgs = Seq("+print-no-cycle-prefix", "+print-file=synthprinttest.out"),
+  platformConfigs = "HostDebugFeatures_DefaultF1Config_WithTokenHashers"
+  ) {
   diffSynthesizedLog("synthprinttest.out0")
 }
 

@@ -603,6 +603,9 @@ int firesim_top_t::exit_code() {
 }
 
 void firesim_top_t::run() {
+
+  token_hashers->set_params(0, 16);
+
   for (auto &e : fpga_models) {
     e->init();
   }
@@ -627,6 +630,9 @@ void firesim_top_t::run() {
         e->tick();
     }
   }
+
+  std::cout << token_hashers->get_csv_string();
+  token_hashers->write_csv_file("rocket-f1-run.csv");
 
   record_end_times();
   fprintf(stderr, "\nSimulation complete.\n");

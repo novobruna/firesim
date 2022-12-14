@@ -74,9 +74,11 @@
     `BIND_AXI_FWD(name, name``_fwd_delay) \
     `BIND_AXI_REV(name, name``_rev_delay)
 
-import "DPI-C" function void tick
+import "DPI-C" function void simulator_begin();
+
+import "DPI-C" function void simulator_tick
 (
-  output bit                                          reset,
+  input  bit                                          reset,
   output bit                                          fin,
 
   output ctrl_rev_t                                   ctrl_rev,
@@ -233,8 +235,16 @@ module emul(
     .reset(reset_delay)
   );
 
+  initial begin
+    simulator_begin();
+    reset = 1'b1;
+    #(`CLOCK_PERIOD * 10.0) reset = 1'b0;
+  end
+
+  bit[31:0] exit_code;
+
   always @(posedge clock) begin
-    tick(
+    simulator_tick(
       reset,
       fin,
       ctrl_rev, ctrl_fwd,
@@ -248,5 +258,8 @@ module emul(
 `ifdef DEBUG
     trace_count = trace_count + 1;
 `endif
+    if (fin) begin
+      $finish;
+    end
   end
 endmodule;

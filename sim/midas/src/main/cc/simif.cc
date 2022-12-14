@@ -40,10 +40,8 @@ simif_t::simif_t(const std::vector<std::string> &args)
   }
 
   gen.seed(seed);
-  fprintf(stderr,
-          "random min: 0x%" PRIx64 ", random max: 0x%" PRIx64 "\n",
-          gen.min(),
-          gen.max());
+  fprintf(stderr, "random min: 0x%" PRIx64 ", random max: 0x%" PRIx64 "\n",
+          gen.min(), gen.max());
 }
 
 void simif_t::target_init() {
@@ -55,11 +53,8 @@ void simif_t::target_init() {
   }
 }
 
-int simif_t::run() {
-  host_init();
-  sim_init();
+int simif_t::target_run() {
   target_init();
-
   if (do_zero_out_dram) {
     fprintf(stderr, "Zeroing out FPGA DRAM. This will take a few seconds...\n");
     zero_out_dram();
@@ -74,8 +69,6 @@ int simif_t::run() {
   sim->simulation_finish();
 
   print_simulation_performance_summary();
-
-  host_finish();
   return exitcode;
 }
 
@@ -206,7 +199,6 @@ void simif_t::print_simulation_performance_summary() {
     fprintf(stderr, "%.3f KHz\n", sim_speed);
   }
   fprintf(stderr, "FMR: %.2f\n", fmr);
-  fprintf(stderr,
-          "Note: The latter three figures are based on the fastest "
-          "target clock.\n");
+  fprintf(stderr, "Note: The latter three figures are based on the fastest "
+                  "target clock.\n");
 }

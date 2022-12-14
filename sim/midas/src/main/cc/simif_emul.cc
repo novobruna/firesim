@@ -27,9 +27,10 @@ simif_emul_t::simif_emul_t(const std::vector<std::string> &args)
 
   master = new mmio_t(CTRL_BEAT_BYTES);
   cpu_managed_axi4 = new mmio_t(CPU_MANAGED_AXI4_BEAT_BYTES);
-  slave = new mm_t *[MEM_NUM_CHANNELS];
   cpu_mem = new mm_magic_t;
-  for (int i = 0; i < MEM_NUM_CHANNELS; i++) {
+
+  slave = new mm_t *[MEM_NUM_CHANNELS];
+  for (unsigned i = 0; i < MEM_NUM_CHANNELS; ++i) {
     slave[i] = (mm_t *)new mm_magic_t;
     slave[i]->init(memsize, MEM_BEAT_BYTES, 64);
   }
@@ -78,14 +79,11 @@ simif_emul_t::~simif_emul_t(){};
 
 void simif_emul_t::host_init() {
   // Parse args
-
   if (fastloadmem && !loadmem.empty()) {
     fprintf(stdout, "[fast loadmem] %s\n", loadmem.c_str());
     load_mems(loadmem.c_str());
   }
 }
-
-void simif_emul_t::host_finish() { finish(); }
 
 void simif_emul_t::wait_write(mmio_t *mmio) {
   while (!mmio->write_resp())

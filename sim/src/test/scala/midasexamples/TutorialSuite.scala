@@ -184,12 +184,12 @@ abstract class TutorialSuite(
 class GCDF1Test extends TutorialSuite("GCD")
 // Hijack Parity to test all of the Midas-level backends
 class ParityF1Test extends TutorialSuite("Parity") {
-  runTest("verilator", true)
+  //runTest("verilator", true)
   runTest("vcs", true)
 }
 
 class ParityVitisTest extends TutorialSuite("Parity", platformConfigs = classOf[DefaultVitisConfig].getSimpleName) {
-  runTest("verilator", true)
+  //runTest("verilator", true)
   runTest("vcs", true)
 }
 

@@ -91,38 +91,15 @@ public:
   simif_t(const std::vector<std::string> &args);
   virtual ~simif_t() {}
 
-protected:
-  /// Reference to the user-defined bits of the simulation.
-  std::unique_ptr<simulation_t> sim;
-
-  std::string loadmem;
-  bool fastloadmem = false;
-  // If set, will write all zeros to fpga dram before commencing simulation
-  bool do_zero_out_dram = false;
-
-private:
-  // random numbers
-  uint64_t seed = 0;
-  std::mt19937_64 gen;
-  const SIMULATIONMASTER_struct master_mmio_addrs;
-  const LOADMEMWIDGET_struct loadmem_mmio_addrs;
-  const CLOCKBRIDGEMODULE_struct clock_bridge_mmio_addrs;
-  midas_time_t start_time, end_time;
-  uint64_t start_hcycle = -1;
-  uint64_t end_hcycle = 0;
-  uint64_t end_tcycle = 0;
-
   virtual void load_mem(std::string filename);
 
 public:
   // Simulation APIs
-  void target_init();
+  int target_run();
 
   /**
    * Simulation main loop.
    */
-  int run();
-
   virtual void sim_init() = 0;
 
   inline bool done() { return read(master_mmio_addrs.DONE); }
@@ -132,21 +109,6 @@ public:
       while (!done())
         ;
   }
-
-  // Host-platform interface. See simif_f1; simif_emul for implementation
-  // examples
-
-  /**
-   * Performs platform-level initialization that for some reason or another
-   * cannot be done in the constructor. (For one, currently command line args
-   * are not passed to constructor).
-   */
-  virtual void host_init() = 0;
-
-  /**
-   *  Does final platform-specific cleanup before destructors are called.
-   */
-  virtual void host_finish() = 0;
 
   /** Bridge / Widget MMIO methods */
 
@@ -184,9 +146,7 @@ public:
    * @returns Number of bytes copied. Can be less than requested.
    *
    */
-  virtual size_t pull(unsigned int stream_idx,
-                      void *dest,
-                      size_t num_bytes,
+  virtual size_t pull(unsigned int stream_idx, void *dest, size_t num_bytes,
                       size_t required_bytes) = 0;
 
   /**
@@ -204,12 +164,30 @@ public:
    * @returns Number of bytes copied. Can be less than requested.
    *
    */
-  virtual size_t push(unsigned int stream_idx,
-                      void *src,
-                      size_t num_bytes,
+  virtual size_t push(unsigned int stream_idx, void *src, size_t num_bytes,
                       size_t required_bytes) = 0;
 
   // End host-platform interface.
+
+  /// Return the seed of the random number generator.
+  uint64_t get_seed() const { return seed; };
+
+  /// Returns the next random number, up to a limit.
+  uint64_t rand_next(uint64_t limit) { return gen() % limit; }
+
+  /**
+   * Returns the current target cycle.
+   *
+   * The cycle returned indicates to the fastest clock in the simulated system,
+   * based on the number of clock tokens enqueued (will report a larger number).
+   */
+  uint64_t actual_tcycle();
+
+  /// Returns the current host cycle as measured by a hardware counter.
+  uint64_t hcycle();
+
+private:
+  void target_init();
 
   // LOADMEM functions
   void read_mem(size_t addr, mpz_t &value);
@@ -217,20 +195,38 @@ public:
   void write_mem_chunk(size_t addr, mpz_t &value, size_t bytes);
   void zero_out_dram();
 
-  uint64_t get_seed() { return seed; };
 
-  // Returns the current target cycle of the fastest clock in the simulated
-  // system, based on the number of clock tokens enqueued (will report a larger
-  // number)
-  uint64_t actual_tcycle();
-  // Returns the current host cycle as measured by a hardware counter
-  uint64_t hcycle();
-  uint64_t rand_next(uint64_t limit) { return gen() % limit; }
-
+  // Helper methods collecting statistics.
   void record_start_times();
   void record_end_times();
   uint64_t get_end_tcycle() { return end_tcycle; }
   void print_simulation_performance_summary();
+
+protected:
+  /// Reference to the user-defined bits of the simulation.
+  std::unique_ptr<simulation_t> sim;
+
+  /// File to load the memory from.
+  std::string loadmem;
+  bool fastloadmem = false;
+  // If set, will write all zeros to fpga dram before commencing simulation
+  bool do_zero_out_dram = false;
+
+private:
+  // random numbers
+  uint64_t seed = 0;
+  std::mt19937_64 gen;
+
+  // mmio ports
+  const SIMULATIONMASTER_struct master_mmio_addrs;
+  const LOADMEMWIDGET_struct loadmem_mmio_addrs;
+  const CLOCKBRIDGEMODULE_struct clock_bridge_mmio_addrs;
+
+  // simulation timer
+  midas_time_t start_time, end_time;
+  uint64_t start_hcycle = -1;
+  uint64_t end_hcycle = 0;
+  uint64_t end_tcycle = 0;
 };
 
 #endif // __SIMIF_H

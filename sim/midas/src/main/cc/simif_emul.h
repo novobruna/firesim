@@ -17,8 +17,7 @@ public:
   simif_emul_t(const std::vector<std::string> &args);
   virtual ~simif_emul_t();
 
-  void host_init() override;
-  void host_finish() override;
+  void host_init();
 
   void write(size_t addr, uint32_t data) override;
   uint32_t read(size_t addr) override;
@@ -58,9 +57,10 @@ public:
    */
   mm_t *cpu_mem;
 
-  uint64_t main_time = 0;
-
-  virtual void finish() = 0;
+public:
+  virtual void begin() = 0;
+  virtual int end() = 0;
+  virtual void do_tick() = 0;
 
 protected:
   // The maximum number of cycles the RTL simulator can advance before
@@ -72,7 +72,12 @@ protected:
   std::string waveform = "dump.vcd";
   uint64_t memsize = 1L << MEM_ADDR_BITS;
 
-  virtual void advance_target() = 0;
+  inline void advance_target() {
+    unsigned nticks = rand_next(maximum_host_delay) + 1;
+    for (unsigned i = 0; i < nticks; ++i)
+      do_tick();
+  }
+
   void wait_read(mmio_t *mmio, void *data);
   void wait_write(mmio_t *mmio);
 

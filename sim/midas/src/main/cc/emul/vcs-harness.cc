@@ -3,14 +3,18 @@
 #include <cmath>
 #include <cstdio>
 
+#include <memory>
 #include <exception>
+
+#include <signal.h>
 
 #include <svdpi.h>
 
-#include "context.h"
 #include "simif_emul_vcs.h"
 
-extern simif_emul_vcs_t *emulator;
+#ifdef VCS
+#include "vc_hdrs.h"
+#endif
 
 /**
  * Helper to encode sequential elements into a packed structure.
@@ -93,9 +97,7 @@ private:
 /**
  * Helper class bridging the simulator AXI4 objects with arguments.
  */
-template <unsigned ID_BITS,
-          unsigned ADDR_BITS,
-          unsigned STRB_BITS,
+template <unsigned ID_BITS, unsigned ADDR_BITS, unsigned STRB_BITS,
           unsigned BEAT_BYTES>
 class AXI4 {
 private:
@@ -125,22 +127,8 @@ public:
     auto ar_addr = r.getScalarOrVector(ADDR_BITS);
     auto ar_valid = r.getScalar();
 
-    mem->tick(rst,
-              ar_valid,
-              ar_addr,
-              ar_id,
-              ar_size,
-              ar_len,
-              aw_valid,
-              aw_addr,
-              aw_id,
-              aw_size,
-              aw_len,
-              w_valid,
-              w_strb,
-              w_data,
-              w_last,
-              r_ready,
+    mem->tick(rst, ar_valid, ar_addr, ar_id, ar_size, ar_len, aw_valid, aw_addr,
+              aw_id, aw_size, aw_len, w_valid, w_strb, w_data, w_last, r_ready,
               b_ready);
   }
 
@@ -158,16 +146,8 @@ public:
     auto aw_ready = r.getScalar();
     auto ar_ready = r.getScalar();
 
-    mmio->tick(rst,
-               ar_ready,
-               aw_ready,
-               w_ready,
-               r_id,
-               r_data,
-               r_last,
-               r_valid,
-               b_id,
-               b_valid);
+    mmio->tick(rst, ar_ready, aw_ready, w_ready, r_id, r_data, r_last, r_valid,
+               b_id, b_valid);
   }
 
   static void fwd_put(mm_t *mem, svBitVecVal *io) {
@@ -209,21 +189,27 @@ public:
 using Ctrl =
     AXI4<CTRL_ID_BITS, CTRL_ADDR_BITS, CTRL_STRB_BITS, CTRL_BEAT_BYTES>;
 
-using CpuManagedAXI4 = AXI4<CPU_MANAGED_AXI4_ID_BITS,
-                            CPU_MANAGED_AXI4_ADDR_BITS,
-                            CPU_MANAGED_AXI4_STRB_BITS,
-                            CPU_MANAGED_AXI4_BEAT_BYTES>;
+using CpuManagedAXI4 =
+    AXI4<CPU_MANAGED_AXI4_ID_BITS, CPU_MANAGED_AXI4_ADDR_BITS,
+         CPU_MANAGED_AXI4_STRB_BITS, CPU_MANAGED_AXI4_BEAT_BYTES>;
 
-using FpgaManagedAXI4 = AXI4<FPGA_MANAGED_AXI4_ID_BITS,
-                             FPGA_MANAGED_AXI4_ADDR_BITS,
-                             FPGA_MANAGED_AXI4_STRB_BITS,
-                             FPGA_MANAGED_AXI4_BEAT_BYTES>;
+using FpgaManagedAXI4 =
+    AXI4<FPGA_MANAGED_AXI4_ID_BITS, FPGA_MANAGED_AXI4_ADDR_BITS,
+         FPGA_MANAGED_AXI4_STRB_BITS, FPGA_MANAGED_AXI4_BEAT_BYTES>;
 
 using Memory = AXI4<MEM_ID_BITS, MEM_ADDR_BITS, MEM_STRB_BITS, MEM_BEAT_BYTES>;
 
+static simif_emul_vcs_t *simulator = nullptr;
+
 extern "C" {
-void tick(
-    /* OUTPUT */ svBit *reset,
+void simulator_begin() {
+  assert(!simulator && "simulator already initialised");
+  simulator = new simif_emul_vcs_t();
+  simulator->begin();
+}
+
+void simulator_tick(
+    /* INPUT  */ const svBit reset,
     /* OUTPUT */ svBit *fin,
 
     /* OUTPUT */ svBitVecVal *ctrl_out,
@@ -246,64 +232,64 @@ void tick(
   try {
     // The driver ucontext is initialized before spawning the VCS
     // context, so these pointers should be initialized.
-    assert(emulator != nullptr);
-    assert(emulator->cpu_managed_axi4 != nullptr);
-    assert(emulator->master != nullptr);
+    assert(simulator != nullptr);
+    assert(simulator->cpu_managed_axi4 != nullptr);
+    assert(simulator->master != nullptr);
 
-    bool rst = emulator->vcs_rst;
 
-    Ctrl::fwd_tick(rst, emulator->master, ctrl_in);
+    Ctrl::fwd_tick(reset, simulator->master, ctrl_in);
 
 #ifdef CPU_MANAGED_AXI4_PRESENT
-    CpuManagedAXI4::fwd_tick(
-        rst, emulator->cpu_managed_axi4, cpu_managed_axi4_in);
+    CpuManagedAXI4::fwd_tick(reset, simulator->cpu_managed_axi4,
+                             cpu_managed_axi4_in);
 #endif // CPU_MANAGED_AXI4_PRESENT
 
 #ifdef FPGA_MANAGED_AXI4_PRESENT
-    FpgaManagedAXI4::rev_tick(rst, emulator->cpu_mem, fpga_managed_axi4_in);
+    FpgaManagedAXI4::rev_tick(reset, simulator->cpu_mem, fpga_managed_axi4_in);
 #endif // FPGA_MANAGED_AXI4_PRESENT
 
-    Memory::rev_tick(rst, emulator->slave[0], mem_0_in);
+    Memory::rev_tick(reset, simulator->slave[0], mem_0_in);
 #ifdef MEM_HAS_CHANNEL1
-    Memory::rev_tick(rst, emulator->slave[1], mem_1_in);
+    Memory::rev_tick(reset, simulator->slave[1], mem_1_in);
 #endif
 #ifdef MEM_HAS_CHANNEL2
-    Memory::rev_tick(rst, emulator->slave[2], mem_2_in);
+    Memory::rev_tick(reset, simulator->slave[2], mem_2_in);
 #endif
 #ifdef MEM_HAS_CHANNEL3
-    Memory::rev_tick(rst, emulator->slave[3], mem_3_in);
+    Memory::rev_tick(reset, simulator->slave[3], mem_3_in);
 #endif
 
-    if (!emulator->vcs_fin)
-      emulator->host->switch_to();
-    else
-      emulator->vcs_fin = false;
+    bool finished = simulator->to_sim();
 
-    Ctrl::rev_put(emulator->master, ctrl_out);
+    if (finished) {
+      int exit_code = simulator->end();
+      delete simulator;
+      if (exit_code)
+        exit(exit_code);
+    } else {
+      Ctrl::rev_put(simulator->master, ctrl_out);
+    #ifdef CPU_MANAGED_AXI4_PRESENT
+        CpuManagedAXI4::rev_put(simulator->cpu_managed_axi4, cpu_managed_axi4_out);
+    #endif // CPU_MANAGED_AXI4_PRESENT
 
-#ifdef CPU_MANAGED_AXI4_PRESENT
-    CpuManagedAXI4::rev_put(emulator->cpu_managed_axi4, cpu_managed_axi4_out);
-#endif // CPU_MANAGED_AXI4_PRESENT
+    #ifdef FPGA_MANAGED_AXI4_PRESENT
+        FpgaManagedAXI4::fwd_put(simulator->cpu_mem, fpga_managed_axi4_out);
+    #endif // FPGA_MANAGED_AXI4_PRESENT
 
-#ifdef FPGA_MANAGED_AXI4_PRESENT
-    FpgaManagedAXI4::fwd_put(emulator->cpu_mem, fpga_managed_axi4_out);
-#endif // FPGA_MANAGED_AXI4_PRESENT
+        Memory::fwd_put(simulator->slave[0], mem_0_out);
+    #ifdef MEM_HAS_CHANNEL1
+        Memory::fwd_put(simulator->slave[1], mem_1_out);
+    #endif
+    #ifdef MEM_HAS_CHANNEL2
+        Memory::fwd_put(simulator->slave[2], mem_2_out);
+    #endif
+    #ifdef MEM_HAS_CHANNEL3
+        Memory::fwd_put(simulator->slave[3], mem_3_out);
+    #endif
+    }
 
-    Memory::fwd_put(emulator->slave[0], mem_0_out);
-#ifdef MEM_HAS_CHANNEL1
-    Memory::fwd_put(emulator->slave[1], mem_1_out);
-#endif
-#ifdef MEM_HAS_CHANNEL2
-    Memory::fwd_put(emulator->slave[2], mem_2_out);
-#endif
-#ifdef MEM_HAS_CHANNEL3
-    Memory::fwd_put(emulator->slave[3], mem_3_out);
-#endif
+    *fin = finished;
 
-    *reset = emulator->vcs_rst;
-    *fin = emulator->vcs_fin;
-
-    emulator->main_time++;
   } catch (std::exception &e) {
     fprintf(stderr, "Caught Exception headed for VCS: %s.\n", e.what());
     abort();

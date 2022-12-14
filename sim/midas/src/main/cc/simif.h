@@ -111,9 +111,6 @@ public:
         ;
   }
 
-  /// Entry point to the simulation.
-  virtual int run() = 0;
-
   // Host-platform interface. See simif_f1; simif_emul for implementation
   // examples
 

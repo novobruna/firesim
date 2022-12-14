@@ -74,9 +74,9 @@
     `BIND_AXI_FWD(name, name``_fwd_delay) \
     `BIND_AXI_REV(name, name``_rev_delay)
 
-import "DPI-C" function void tick
+import "DPI-C" function void simulator_tick
 (
-  output bit                                          reset,
+  input  bit                                          reset,
   output bit                                          fin,
 
   output ctrl_rev_t                                   ctrl_rev,
@@ -101,33 +101,33 @@ import "DPI-C" function void tick
 module emul(
 `ifdef VERILATOR
   input bit clock,
-  input bit pre_clock,
-  input bit post_clock
+  input bit sync_clock,
+  input bit reset,
+  output bit fin
 `endif
 );
-
 `ifndef VERILATOR
-  bit clock;
-  initial clock = 1'b0;
-  always clock = #(`CLOCK_PERIOD / 2.0) ~clock;
-
-  bit pre_clock;
+  reg fin = 1'b0;
+  reg clock;
+  reg sync_clock;
   initial begin
-    pre_clock = 1'b0;
-    #(`CLOCK_PERIOD / 2.0 - 0.1) forever
-      pre_clock = #(`CLOCK_PERIOD / 2.0) ~pre_clock;
+    clock <= 1'b0;
+    sync_clock <= 1'b0;
+
+    while (!fin) begin
+      #(`CLOCK_PERIOD / 4.0) sync_clock = 1'b1;
+      #(`CLOCK_PERIOD / 4.0) clock = 1'b1;
+      #(`CLOCK_PERIOD / 4.0) sync_clock = 1'b0;
+      #(`CLOCK_PERIOD / 4.0) clock = 1'b0;
+    end
   end
 
-  bit post_clock;
+  reg reset;
   initial begin
-    post_clock = 1'b0;
-    #(`CLOCK_PERIOD / 2.0 + 0.1) forever
-      post_clock = #(`CLOCK_PERIOD / 2.0) ~post_clock;
+    reset = 1'b1;
+    #(`CLOCK_PERIOD * 9.0) reset = 1'b0;
   end
 `endif
-
-  reg reset = 1'b1;
-  reg fin = 1'b0;
 
 `ifdef DEBUG
   reg [2047:0] vcdplusfile = 2048'h0;
@@ -186,9 +186,7 @@ module emul(
   mem_fwd_t mem_3_fwd_delay;
   mem_rev_t mem_3_rev_delay;
 
-  bit reset_delay;
-
-  always_ff @(posedge pre_clock) begin
+  always_ff @(posedge sync_clock) begin
     ctrl_fwd = ctrl_fwd_delay;
     cpu_managed_axi4_fwd = cpu_managed_axi4_fwd_delay;
     fpga_managed_axi4_rev = fpga_managed_axi4_rev_delay;
@@ -196,9 +194,7 @@ module emul(
     mem_1_rev = mem_1_rev_delay;
     mem_2_rev = mem_2_rev_delay;
     mem_3_rev = mem_3_rev_delay;
-  end
 
-  always_ff @(posedge post_clock) begin
     ctrl_rev_delay = ctrl_rev;
     cpu_managed_axi4_rev_delay = cpu_managed_axi4_rev;
     fpga_managed_axi4_fwd_delay = fpga_managed_axi4_fwd;
@@ -206,7 +202,6 @@ module emul(
     mem_1_fwd_delay = mem_1_fwd;
     mem_2_fwd_delay = mem_2_fwd;
     mem_3_fwd_delay = mem_3_fwd;
-    reset_delay = reset;
   end
 
   FPGATop FPGATop(
@@ -230,11 +225,13 @@ module emul(
     `BIND_CHANNEL(mem_3)
 `endif
     .clock(clock),
-    .reset(reset_delay)
+    .reset(reset)
   );
 
+  bit[31:0] exit_code;
+
   always @(posedge clock) begin
-    tick(
+    simulator_tick(
       reset,
       fin,
       ctrl_rev, ctrl_fwd,
@@ -245,6 +242,7 @@ module emul(
       mem_2_rev, mem_2_fwd,
       mem_3_rev, mem_3_fwd
     );
+
 `ifdef DEBUG
     trace_count = trace_count + 1;
 `endif

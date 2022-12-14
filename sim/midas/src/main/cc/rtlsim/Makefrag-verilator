@@ -29,6 +29,7 @@ override VERILATOR_FLAGS := \
 	-O3 \
 	--output-split 10000 \
 	--output-split-cfuncs 100 \
+	+define+CLOCK_PERIOD=$(CLOCK_PERIOD) \
 	-CFLAGS "$(CXXFLAGS) " \
 	-LDFLAGS "$(LDFLAGS) " \
 	$(VERILATOR_FLAGS)

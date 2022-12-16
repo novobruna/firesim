@@ -1,8 +1,10 @@
 #ifndef MIDAEXAMPLES_BRIDGEHARNESS_H
 #define MIDAEXAMPLES_BRIDGEHARNESS_H
 
+#include "bridges/blockdev.h"
+#include "bridges/peek_poke.h"
+#include "bridges/uart.h"
 #include "simif.h"
-#include "simif_peek_poke.h"
 
 class bridge_driver_t;
 
@@ -15,13 +17,14 @@ class bridge_driver_t;
  * to take control of bridges, it can override the appropriate method and
  * intercept the bridge for later use.
  */
-class BridgeHarness : public simif_peek_poke_t, public simulation_t {
+class BridgeHarness : public simulation_t {
 public:
   BridgeHarness(const std::vector<std::string> &args, simif_t *simif);
 
   virtual ~BridgeHarness();
 
   void add_bridge_driver(bridge_driver_t *bridge);
+  void add_bridge_driver(peek_poke_t *bridge);
 
   void simulation_init() override;
   int simulation_run() override;
@@ -32,7 +35,9 @@ protected:
   virtual unsigned get_tick_limit() const = 0;
 
 private:
+  simif_t *simif;
   std::vector<std::unique_ptr<bridge_driver_t>> bridges;
+  std::unique_ptr<peek_poke_t> peek_poke;
 };
 
 #define TEST_MAIN(CLASS_NAME)                                                  \

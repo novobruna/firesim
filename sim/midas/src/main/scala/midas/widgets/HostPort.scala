@@ -7,7 +7,7 @@ import midas.core.SimUtils
 import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel}
 
 import chisel3._
-import chisel3.util.{ReadyValidIO, Decoupled, DecoupledIO}
+import chisel3.util.{ReadyValidIO, Decoupled, DecoupledIO, Cat}
 import chisel3.experimental.{BaseModule, Direction, ChiselAnnotation, annotate}
 
 import freechips.rocketchip.util.{DecoupledHelper}
@@ -185,34 +185,48 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
 
     println("--------------- partition ---------------")
 
-    val (_, outputFlat) = flt.partition(
-      {
-        case (field, direction) => {
-          direction match {
-            case ActualDirection.Output => false
-            case ActualDirection.Input  => true
-            case _                      => false
-          }
-        }
-      }
-    )
+    // val (_, outputFlat) = flt.partition(
+    //   {
+    //     case (field, direction) => {
+    //       direction match {
+    //         case ActualDirection.Output => false
+    //         case ActualDirection.Input  => true
+    //         case _                      => false
+    //       }
+    //     }
+    //   }
+    // )
+    
+    // putting :Bits here should be removed
+    val toBeCat = flt.collect({case (field: Bits, ActualDirection.Output) => {
+      field
+    }})
+
+    val wasCat = Cat(toBeCat)
+
+
+    val dec = Wire(Output(new DecoupledIO(wasCat.cloneType)))
+    dec.ready := toHost.hReady
+    dec.valid := toHost.hValid
+    dec.bits := wasCat
+    Seq( ("Output", dec))
 
 
 
-    val ret3 = outputFlat.map({ case (field, direction) => // input
-      // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
-      val clean = sanatizeName(""+field.toPrintable)
-      println("Field name: " + clean + " direction: " + direction )
+    // val ret3 = outputFlat.map({ case (field, direction) => // input
+    //   // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
+    //   val clean = sanatizeName(""+field.toPrintable)
+    //   println("Field name: " + clean + " direction: " + direction )
 
-      val dec = Wire(Output(new DecoupledIO(field)))
-      dec.ready := toHost.hReady
-      dec.valid := toHost.hValid
-      dec.bits := field
-      (clean, dec)
-    })
+    //   val dec = Wire(Output(new DecoupledIO(field)))
+    //   dec.ready := toHost.hReady
+    //   dec.valid := toHost.hValid
+    //   dec.bits := field
+    //   (clean, dec)
+    // })
 
 
-    ret3
+    // ret3
   }
   
   def getInputChannelPorts() = {
@@ -224,34 +238,48 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
 
     println("--------------- partition ---------------")
 
-    val (inputFlat, _) = flt.partition(
-      {
-        case (field, direction) => {
-          direction match {
-            case ActualDirection.Output => false
-            case ActualDirection.Input  => true
-            case _                      => false
-          }
-        }
-      }
-    )
+    // val (inputFlat, _) = flt.partition(
+    //   {
+    //     case (field, direction) => {
+    //       direction match {
+    //         case ActualDirection.Output => false
+    //         case ActualDirection.Input  => true
+    //         case _                      => false
+    //       }
+    //     }
+    //   }
+    // )
 
 
 
-    val ret3 = inputFlat.map({ case (field, direction) => // input
-      // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
-      val clean = sanatizeName(""+field.toPrintable)
-      println("Field name: " + clean + " direction: " + direction )
+    // val ret3 = inputFlat.map({ case (field, direction) => // input
+    //   // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
+    //   val clean = sanatizeName(""+field.toPrintable)
+    //   println("Field name: " + clean + " direction: " + direction )
 
-      val dec = Wire(Output(new DecoupledIO(field)))
-      dec.ready := toHost.hReady
-      dec.valid := toHost.hValid
-      dec.bits := field
-      (clean, dec)
-    })
+    //   val dec = Wire(Output(new DecoupledIO(field)))
+    //   dec.ready := toHost.hReady
+    //   dec.valid := toHost.hValid
+    //   dec.bits := field
+    //   (clean, dec)
+    // })
 
 
-    ret3
+    // ret3
+
+    // putting :Bits here should be removed
+    val toBeCat = flt.collect({case (field: Bits, ActualDirection.Output) => {
+      field
+    }})
+
+    val wasCat = Cat(toBeCat)
+
+
+    val dec = Wire(Output(new DecoupledIO(wasCat.cloneType)))
+    dec.ready := toHost.hReady
+    dec.valid := toHost.hValid
+    dec.bits := wasCat
+    Seq( ("Input", dec))
   }
 }
 

@@ -182,51 +182,20 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
 
     // fromHost is output
     // toHost is input
-
-    println("--------------- partition ---------------")
-
-    // val (_, outputFlat) = flt.partition(
-    //   {
-    //     case (field, direction) => {
-    //       direction match {
-    //         case ActualDirection.Output => false
-    //         case ActualDirection.Input  => true
-    //         case _                      => false
-    //       }
-    //     }
-    //   }
-    // )
     
     // putting :Bits here should be removed
-    val toBeCat = flt.collect({case (field: Bits, ActualDirection.Output) => {
+    val toBeCatOutput = flt.collect({case (field: Bits, ActualDirection.Output) => {
       field
     }})
 
-    val wasCat = Cat(toBeCat)
+    val wasCatOutput = Cat(toBeCatOutput)
 
 
-    val dec = Wire(Output(new DecoupledIO(wasCat.cloneType)))
-    dec.ready := toHost.hReady
-    dec.valid := toHost.hValid
-    dec.bits := wasCat
-    Seq( ("Output", dec))
-
-
-
-    // val ret3 = outputFlat.map({ case (field, direction) => // input
-    //   // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
-    //   val clean = sanatizeName(""+field.toPrintable)
-    //   println("Field name: " + clean + " direction: " + direction )
-
-    //   val dec = Wire(Output(new DecoupledIO(field)))
-    //   dec.ready := toHost.hReady
-    //   dec.valid := toHost.hValid
-    //   dec.bits := field
-    //   (clean, dec)
-    // })
-
-
-    // ret3
+    val decOutput = Wire(Output(new DecoupledIO(wasCatOutput.cloneType)))
+    decOutput.ready := fromHost.hReady
+    decOutput.valid := fromHost.hValid
+    decOutput.bits := wasCatOutput
+    Seq( ("Output", decOutput))
   }
   
   def getInputChannelPorts() = {
@@ -236,50 +205,19 @@ class HostPortIO[+T <: Data](private val targetPortProto: T) extends Record with
     // fromHost is output
     // toHost is input
 
-    println("--------------- partition ---------------")
-
-    // val (inputFlat, _) = flt.partition(
-    //   {
-    //     case (field, direction) => {
-    //       direction match {
-    //         case ActualDirection.Output => false
-    //         case ActualDirection.Input  => true
-    //         case _                      => false
-    //       }
-    //     }
-    //   }
-    // )
-
-
-
-    // val ret3 = inputFlat.map({ case (field, direction) => // input
-    //   // println("Field type: " + field.getClass + " " + field.getWidth + " '" + field.toPrintable + "' direction: " + direction.getClass )
-    //   val clean = sanatizeName(""+field.toPrintable)
-    //   println("Field name: " + clean + " direction: " + direction )
-
-    //   val dec = Wire(Output(new DecoupledIO(field)))
-    //   dec.ready := toHost.hReady
-    //   dec.valid := toHost.hValid
-    //   dec.bits := field
-    //   (clean, dec)
-    // })
-
-
-    // ret3
-
     // putting :Bits here should be removed
-    val toBeCat = flt.collect({case (field: Bits, ActualDirection.Output) => {
+    val toBeCatInput = flt.collect({case (field: Bits, ActualDirection.Input) => {
       field
     }})
 
-    val wasCat = Cat(toBeCat)
+    val wasCatInput = Cat(toBeCatInput)
 
 
-    val dec = Wire(Output(new DecoupledIO(wasCat.cloneType)))
-    dec.ready := toHost.hReady
-    dec.valid := toHost.hValid
-    dec.bits := wasCat
-    Seq( ("Input", dec))
+    val decInput = Wire(Output(new DecoupledIO(wasCatInput.cloneType)))
+    decInput.ready := toHost.hReady
+    decInput.valid := toHost.hValid
+    decInput.bits := wasCatInput
+    Seq( ("Input", decInput))
   }
 }
 

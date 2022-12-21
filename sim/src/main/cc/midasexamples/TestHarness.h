@@ -26,7 +26,7 @@ class TestHarness : public simif_peek_poke_t, public simulation_t {
 public:
   TestHarness(const std::vector<std::string> &args, simif_t *simif)
       : simif_peek_poke_t(simif, PEEKPOKEBRIDGEMODULE_0_substruct_create),
-        simulation_t(args) {}
+        simulation_t(*simif, args) {}
 
   virtual ~TestHarness() {}
 

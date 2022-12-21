@@ -11,7 +11,7 @@
 fasedtests_top_t::fasedtests_top_t(const std::vector<std::string> &args,
                                    simif_t *simif)
     : simif_peek_poke_t(simif, PEEKPOKEBRIDGEMODULE_0_substruct_create),
-      simulation_t(args) {
+      simulation_t(*simif, args) {
   max_cycles = -1;
   profile_interval = max_cycles;
 
@@ -76,8 +76,6 @@ void fasedtests_top_t::simulation_init() {
 }
 
 int fasedtests_top_t::simulation_run() {
-  fprintf(stderr, "Commencing simulation.\n");
-
   while (!simulation_complete() && !finished_scheduled_tasks()) {
     run_scheduled_tasks();
     step(get_largest_stepsize(), false);
@@ -87,33 +85,7 @@ int fasedtests_top_t::simulation_run() {
     }
   }
 
-  fprintf(stderr, "\nSimulation complete.\n");
-
-  int exitcode = exit_code();
-
-  // If the simulator is idle and we've gotten here without any bridge
-  // indicating doneness, we've advanced to the +max_cycles limit in the fastest
-  // target clock domain.
-  bool max_cycles_timeout =
-      !simulation_complete() && simif->done() && finished_scheduled_tasks();
-
-  if (exitcode != 0) {
-    fprintf(stderr,
-            "*** FAILED *** (code = %d) after %" PRIu64 " cycles\n",
-            exitcode,
-            simif->get_end_tcycle());
-  } else if (max_cycles_timeout) {
-    fprintf(stderr,
-            "*** FAILED *** +max_cycles specified timeout after %" PRIu64
-            " cycles\n",
-            simif->get_end_tcycle());
-  } else {
-    fprintf(stderr,
-            "*** PASSED *** after %" PRIu64 " cycles\n",
-            simif->get_end_tcycle());
-  }
-
-  return ((exitcode != 0) || max_cycles_timeout) ? EXIT_FAILURE : EXIT_SUCCESS;
+  return exit_code();
 }
 
 void fasedtests_top_t::simulation_finish() {

@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include <map>
+
 #include <sys/time.h>
 
 #include "bridges/clock.h"
@@ -35,7 +36,8 @@ double diff_secs(midas_time_t end, midas_time_t start);
  */
 class simulation_t {
 public:
-  simulation_t(const std::vector<std::string> &args) : args(args) {}
+  simulation_t(simif_t &sim, const std::vector<std::string> &args)
+      : args(args), sim(sim) {}
 
   virtual ~simulation_t() {}
 
@@ -64,8 +66,37 @@ public:
    */
   virtual void simulation_finish() {}
 
+  /**
+   * Return true if the simulation timed out.
+   */
+  virtual bool simulation_timed_out() { return false; }
+
+  /**
+   * Simulation main loop.
+   *
+   * Initialises the simulation, runs it and cleans it up. Prints profiling
+   * info afterwards.
+   *
+   * Returns an exit code from the simulation.
+   */
+  int run();
+
 protected:
   const std::vector<std::string> args;
+
+private:
+  /// Simulation interface.
+  simif_t &sim;
+
+  // Simulation performance counters.
+  void record_start_times();
+  void record_end_times();
+  void print_simulation_performance_summary();
+
+  midas_time_t start_time, end_time;
+  uint64_t start_hcycle = -1;
+  uint64_t end_hcycle = 0;
+  uint64_t end_tcycle = 0;
 };
 
 ;
@@ -202,9 +233,9 @@ public:
   uint64_t actual_tcycle() { return clock.tcycle(); }
 
   /**
-   * Returns the last completed cycle number.
+   * Provides the current host cycle.
    */
-  uint64_t get_end_tcycle() { return end_tcycle; }
+  uint64_t actual_hcycle() { return clock.hcycle(); }
 
   /**
    * Return a reference to the LoadMem widget.
@@ -216,11 +247,6 @@ private:
    * Waits for the target to be initialised.
    */
   void target_init();
-
-  // Simulation performance counters.
-  void record_start_times();
-  void record_end_times();
-  void print_simulation_performance_summary();
 
   void load_mem(std::string filename);
 
@@ -264,11 +290,6 @@ private:
   // random numbers
   uint64_t seed = 0;
   std::mt19937_64 gen;
-
-  midas_time_t start_time, end_time;
-  uint64_t start_hcycle = -1;
-  uint64_t end_hcycle = 0;
-  uint64_t end_tcycle = 0;
 };
 
 #endif // __SIMIF_H

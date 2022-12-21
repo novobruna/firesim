@@ -38,7 +38,7 @@ private:
 public:
   UARTModuleTest(const std::vector<std::string> &args, simif_t *simif)
       : simif_peek_poke_t(simif, PEEKPOKEBRIDGEMODULE_0_substruct_create),
-        simulation_t(args),
+        simulation_t(*simif, args),
         uart(std::make_unique<uart_t>(simif,
                                       UARTBRIDGEMODULE_0_substruct_create,
                                       std::make_unique<Handler>(*this))) {}

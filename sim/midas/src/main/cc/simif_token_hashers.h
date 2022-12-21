@@ -4,6 +4,8 @@
 #define __SIMIF_TOKEN_HASHERS_H
 
 #include <vector>
+#include <string>
+#include <cstddef>
 
 // forward declare
 class simif_t;
